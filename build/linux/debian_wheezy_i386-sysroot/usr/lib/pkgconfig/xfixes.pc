@@ -1,0 +1,12 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/i386-linux-gnu
+includedir=${prefix}/include
+
+Name: Xfixes
+Description: X Fixes  Library
+Version: 5.0
+Requires: xproto fixesproto >= 5.0
+Requires.private: x11
+Cflags: -I${includedir}
+Libs: -L${libdir} -lXfixes

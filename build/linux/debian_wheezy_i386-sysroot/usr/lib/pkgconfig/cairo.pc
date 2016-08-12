@@ -1,0 +1,13 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/i386-linux-gnu
+includedir=${prefix}/include
+
+Name: cairo
+Description: Multi-platform 2D graphics library
+Version: 1.12.2
+
+Requires.private:    gobject-2.0 glib-2.0       pixman-1 >= 0.22.0    fontconfig >= 2.2.95 freetype2 >= 9.7.3   libpng xcb-shm xcb >= 1.6 xcb-render >= 1.6 xrender >= 0.6 x11 
+Libs: -L${libdir} -lcairo
+Libs.private:             -lz -lz         
+Cflags: -I${includedir}/cairo

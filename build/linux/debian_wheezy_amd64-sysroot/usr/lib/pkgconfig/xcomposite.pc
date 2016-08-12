@@ -1,0 +1,12 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+
+Name: Xcomposite
+Description: X Composite Extension Library
+Version: 0.4.3
+Requires: xproto compositeproto >= 0.4
+Requires.private: x11 xfixes
+Cflags: -I${includedir}
+Libs: -L${libdir} -lXcomposite

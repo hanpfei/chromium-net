@@ -1,0 +1,11 @@
+prefix=/usr
+includedir=/usr/include
+libdir=/usr/lib/x86_64-linux-gnu
+idsdir=/usr/share/misc
+
+Name: libpci
+Description: libpci
+Version: 3.1.9
+Libs: -L${libdir} -lpci
+Libs.private: 
+Cflags: -I${includedir}

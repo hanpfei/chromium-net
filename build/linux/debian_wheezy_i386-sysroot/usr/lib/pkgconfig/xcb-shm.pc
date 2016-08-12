@@ -1,0 +1,11 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/i386-linux-gnu
+includedir=${prefix}/include
+
+Name: XCB Shm
+Description: XCB Shm Extension
+Version: 1.8.1
+Requires: xcb
+Libs: -L${libdir} -lxcb-shm
+Cflags: -I${includedir}

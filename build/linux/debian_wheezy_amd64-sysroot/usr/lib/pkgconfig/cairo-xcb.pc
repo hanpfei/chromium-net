@@ -1,0 +1,12 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+
+Name: cairo-xcb
+Description: XCB surface backend for cairo graphics library
+Version: 1.12.2
+
+Requires: cairo xcb >= 1.6 xcb-render >= 1.6
+Libs:  
+Cflags: -I${includedir}/cairo 

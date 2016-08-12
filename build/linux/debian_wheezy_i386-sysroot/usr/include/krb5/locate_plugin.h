@@ -1,0 +1,1 @@
+../mit-krb5/krb5/locate_plugin.h

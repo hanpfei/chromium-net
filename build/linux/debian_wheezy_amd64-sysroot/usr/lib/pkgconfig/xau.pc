@@ -1,0 +1,11 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+
+Name: Xau
+Description: X authorization file management libary
+Version: 1.0.7
+Requires: xproto
+Cflags: -I${includedir}
+Libs: -L${libdir} -lXau

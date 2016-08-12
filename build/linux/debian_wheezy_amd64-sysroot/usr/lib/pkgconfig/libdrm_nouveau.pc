@@ -1,0 +1,11 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+
+Name: libdrm_nouveau
+Description: Userspace interface to nouveau kernel DRM services
+Version: 0.6
+Libs: -L${libdir} -ldrm_nouveau
+Cflags: -I${includedir} -I${includedir}/libdrm -I${includedir}/nouveau
+Requires.private: libdrm

@@ -1,0 +1,14 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+gconf_serverdir=${libdir}/gconf
+gconf_defaultpath=/etc/gconf/2/path
+
+Name: gconf
+Description: GNOME Config System.
+Version: 3.2.5
+Requires: glib-2.0
+Requires.private: dbus-1 gio-2.0
+Libs: -L${libdir} -lgconf-2
+Cflags: -I${includedir}/gconf/2

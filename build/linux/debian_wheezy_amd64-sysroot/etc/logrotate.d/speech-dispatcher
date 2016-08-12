@@ -1,0 +1,21 @@
+/var/log/speech-dispatcher/speech-dispatcher.log /var/log/speech-dispatcher/speech-dispatcher-protocol.log {
+  daily
+  compress
+  missingok
+  sharedscripts
+  rotate 7
+  postrotate
+    /etc/init.d/speech-dispatcher reload >/dev/null
+  endscript
+}
+
+/var/log/speech-dispatcher/debug-epos-generic /var/log/speech-dispatcher/debug-festival /var/log/speech-dispatcher/debug-flite {
+  daily
+  compress
+  missingok
+  sharedscripts
+  rotate 2
+  postrotate
+    /etc/init.d/speech-dispatcher reload >/dev/null
+  endscript
+}

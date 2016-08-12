@@ -1,0 +1,11 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+
+Name: libdrm
+Description: Userspace interface to kernel DRM services
+Version: 2.4.40
+Requires: libdrm
+Libs: -L${libdir} -ldrm_intel
+Cflags: -I${includedir} -I${includedir}/libdrm

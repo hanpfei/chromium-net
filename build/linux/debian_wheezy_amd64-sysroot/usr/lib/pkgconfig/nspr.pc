@@ -1,0 +1,10 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=/usr/lib/x86_64-linux-gnu
+includedir=${prefix}/include/nspr
+
+Name: NSPR
+Description: The Netscape Portable Runtime
+Version: 4.9.2
+Libs: -L/usr/lib/x86_64-linux-gnu -lplds4 -lplc4 -lnspr4
+Cflags: -I${prefix}/include/nspr

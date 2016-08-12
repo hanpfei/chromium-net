@@ -1,0 +1,14 @@
+# Default settings for libnss-db
+
+# Location of files
+ETC = /etc
+
+# Databases to generate
+DBS = passwd group ethers protocols rpc services shadow netgroup
+
+# Directory where the databases are kept
+VAR_DB = /var/lib/misc
+
+# Programs used
+AWK = awk
+MAKEDB = makedb --quiet

@@ -1,0 +1,11 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=/usr/lib/i386-linux-gnu
+includedir=/usr/include
+dridriverdir=/usr/lib/i386-linux-gnu/dri
+
+Name: dri
+Description: Direct Rendering Infrastructure
+Version: 8.0.5
+Requires.private: libdrm >= 2.4.24
+Cflags: -I${includedir}

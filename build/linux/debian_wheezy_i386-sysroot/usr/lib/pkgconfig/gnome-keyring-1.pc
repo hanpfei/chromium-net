@@ -1,0 +1,11 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=/usr/lib/i386-linux-gnu
+includedir=${prefix}/include
+
+Name: gnome-keyring
+Description: The GNOME keyring libraries
+Version: 3.4.1
+Requires: glib-2.0
+Libs: -L${libdir} -lgnome-keyring
+Cflags: -I${includedir}/gnome-keyring-1

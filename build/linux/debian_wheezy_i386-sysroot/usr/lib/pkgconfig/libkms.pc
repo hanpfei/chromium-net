@@ -1,0 +1,10 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/i386-linux-gnu
+includedir=${prefix}/include
+
+Name: libkms
+Description: Library that abstract aways the different mm interface for kernel drivers
+Version: 1.0.0
+Libs: -L${libdir} -lkms
+Cflags: -I${includedir}/libkms

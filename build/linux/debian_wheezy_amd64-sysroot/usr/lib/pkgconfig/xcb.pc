@@ -1,0 +1,13 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+xcbproto_version=1.7.1
+
+Name: XCB
+Description: X-protocol C Binding
+Version: 1.8.1
+Requires.private: pthread-stubs xau >= 0.99.2 xdmcp
+Libs: -L${libdir} -lxcb
+Libs.private: 
+Cflags: -I${includedir}

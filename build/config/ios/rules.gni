@@ -1,0 +1,1489 @@
+# Copyright 2015 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/config/ios/ios_sdk.gni")
+import("//build/config/mac/base_rules.gni")
+import("//build/config/mac/symbols.gni")
+
+_is_secondary_build =
+    additional_toolchains != [] && current_toolchain != default_toolchain
+
+_code_signing_script_path = "//build/config/ios/codesign.py"
+_default_entitlements_path = "//build/config/ios/entitlements.plist"
+
+# Generates Info.plist files for Mac apps and frameworks.
+#
+# Arguments
+#
+#     info_plist:
+#         (optional) string, path to the Info.plist file that will be used for
+#         the bundle.
+#
+#     info_plist_target:
+#         (optional) string, if the info_plist is generated from an action,
+#         rather than a regular source file, specify the target name in lieu
+#         of info_plist. The two arguments are mutually exclusive.
+#
+#     executable_name:
+#         string, name of the generated target used for the product
+#         and executable name as specified in the output Info.plist.
+#
+#     extra_substitutions:
+#         (optional) string array, 'key=value' pairs for extra fields which are
+#         specified in a source Info.plist template.
+template("ios_info_plist") {
+  assert(defined(invoker.info_plist) != defined(invoker.info_plist_target),
+         "Only one of info_plist or info_plist_target may be specified in " +
+             target_name)
+
+  if (defined(invoker.info_plist)) {
+    _info_plist = invoker.info_plist
+  } else {
+    _info_plist_target_output = get_target_outputs(invoker.info_plist_target)
+    _info_plist = _info_plist_target_output[0]
+  }
+
+  info_plist(target_name) {
+    format = "binary1"
+    extra_substitutions = []
+    if (defined(invoker.extra_substitutions)) {
+      extra_substitutions = invoker.extra_substitutions
+    }
+    extra_substitutions += [
+      "IOS_DEPLOYMENT_TARGET=$ios_deployment_target",
+      "IOS_PLATFORM_BUILD=$ios_platform_build",
+      "IOS_PLATFORM_NAME=$ios_sdk_name",
+      "IOS_PLATFORM_VERSION=$ios_sdk_version",
+      "IOS_SDK_BUILD=$ios_sdk_build",
+      "IOS_SDK_NAME=$ios_sdk_name$ios_sdk_version",
+      "IOS_SUPPORTED_PLATFORM=$ios_sdk_platform",
+    ]
+    plist_templates = [
+      "//build/config/ios/BuildInfo.plist",
+      _info_plist,
+    ]
+    if (defined(invoker.info_plist_target)) {
+      deps = [
+        invoker.info_plist_target,
+      ]
+    }
+    forward_variables_from(invoker,
+                           [
+                             "executable_name",
+                             "output_name",
+                             "visibility",
+                           ])
+  }
+}
+
+# Template to build an application bundle for iOS.
+#
+# This should be used instead of "executable" built-in target type on iOS.
+# As the template forward the generation of the application executable to
+# an "executable" target, all arguments supported by "executable" targets
+# are also supported by this template.
+#
+# Arguments
+#
+#   output_name:
+#       (optional) string, name of the generated application, if omitted,
+#       defaults to the target_name.
+#
+#   extra_substitutions:
+#       (optional) list of string in "key=value" format, each value will
+#       be used as an additional variable substitution rule when generating
+#       the application Info.plist
+#
+#   info_plist:
+#       (optional) string, path to the Info.plist file that will be used for
+#       the bundle.
+#
+#   info_plist_target:
+#       (optional) string, if the info_plist is generated from an action,
+#       rather than a regular source file, specify the target name in lieu
+#       of info_plist. The two arguments are mutually exclusive.
+#
+#   entitlements_path:
+#       (optional) path to the template to use to generate the application
+#       entitlements by performing variable substitutions, defaults to
+#       //build/config/ios/entitlements.plist.
+#
+#   bundle_extension:
+#       (optional) bundle extension including the dot, default to ".app".
+#
+#   product_type
+#       (optional) string, product type for the generated Xcode project,
+#       default to "com.apple.product-type.application". Should generally
+#       not be overridden.
+#
+# For more information, see "gn help executable".
+template("ios_app_bundle") {
+  _output_name = target_name
+  _target_name = target_name
+  if (defined(invoker.output_name)) {
+    _output_name = invoker.output_name
+  }
+
+  # This template expands to multiple targets with some differences between
+  # the the different build configuration.
+  #
+  # For a thin build (i.e. when additional_target_cpus is an empty list),
+  # it compiles the final application binary with an "executable" target,
+  # performs variable expansions on the Info.plist, defines some "bundle_data"
+  # target to pack Info.plist and the executable into the .app bundle, and
+  # finally a "create_bundle" target that packs everything the bundle. If the
+  # bundle needs to be signed, then the binary is copied into the bundle by
+  # the "create_bundle" target and the intermediate "bundle_data" target is
+  # not generated.
+  #
+  # For a multi-architecture build (aka fat-build), the template expands to
+  # a simple "executable" target for non-default toolchain. This is because
+  # the real application bundle will contains a single binary that supports
+  # all the architectures and creating a separate .app bundle for every
+  # architecture would be a waste of time.
+  #
+  # The target for the default toolchain of a multi-architecture build will
+  # build the executable for current_cpu in a temporary location. The real
+  # fat binary will be created by "lipo" command from all those "executable"
+  # target (including those of the non-default toolchains). This additional
+  # target has the same role as the "executable" target of a thin build.
+  #
+  # The rest of the build, including the codesigning step, are the same for
+  # thin and fat builds.
+
+  _executable_extra_deps = []
+  _executable_extra_inputs = []
+  _executable_extra_ldflags = []
+
+  # Embeds the entitlements file if building for simulator. This is optional
+  # with Xcode 7 or older but required with Xcode 8. This is not necessary for
+  # device build as the entitlement is embedded via the codesigning step.
+  if (use_ios_simulator) {
+    _generate_entitlements_target = _target_name + "_gen_entitlements"
+    _generate_entitlements_target_with_toolchain_suffix =
+        "$_generate_entitlements_target($default_toolchain)"
+
+    _generate_entitlements_output =
+        get_label_info(_generate_entitlements_target_with_toolchain_suffix,
+                       "target_gen_dir") + "/$_output_name.xcent"
+
+    _executable_extra_inputs += [ _generate_entitlements_output ]
+    _executable_extra_deps +=
+        [ ":$_generate_entitlements_target_with_toolchain_suffix" ]
+    _executable_extra_ldflags += [
+      "-Xlinker",
+      "-sectcreate",
+      "-Xlinker",
+      "__TEXT",
+      "-Xlinker",
+      "__entitlements",
+      "-Xlinker",
+      rebase_path(_generate_entitlements_output, root_build_dir),
+    ]
+  }
+
+  if (_is_secondary_build) {
+    # For the non-default toolchain of a fat-build, the template expands to a
+    # single "executable" target that creates "$root_out_dir/$_output_name".
+    executable(_target_name) {
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "bundle_deps",
+                               "bundle_deps_filter",
+                               "bundle_extension",
+                               "entitlements_path",
+                               "extra_substitutions",
+                               "extra_system_frameworks",
+                               "info_plist",
+                               "info_plist_target",
+                               "output_name",
+                               "product_type",
+                             ])
+
+      if (defined(visibility)) {
+        visibility += [ ":*($default_toolchain)" ]
+      }
+
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += _executable_extra_deps
+
+      if (!defined(ldflags)) {
+        ldflags = []
+      }
+      ldflags += _executable_extra_ldflags
+
+      if (!defined(inputs)) {
+        inputs = []
+      }
+      inputs += _executable_extra_inputs
+
+      output_name = _output_name
+      if (!defined(libs)) {
+        libs = []
+      }
+      libs += [ "UIKit.framework" ]
+    }
+  } else {
+    # This is either a thin build or the default toolchain of a fat-build.
+    # The template will expand in many different target ($target_name is the
+    # create_bundle target) used as input to the create_bundle target.
+    _generate_info_plist = target_name + "_generate_info_plist"
+    _bundle_data_info_plist = target_name + "_bundle_data_info_plist"
+
+    _entitlements_path = _default_entitlements_path
+    if (defined(invoker.entitlements_path)) {
+      _entitlements_path = invoker.entitlements_path
+    }
+
+    ios_info_plist(_generate_info_plist) {
+      visibility = [ ":$_bundle_data_info_plist" ]
+      if (use_ios_simulator) {
+        visibility += [ ":$_generate_entitlements_target" ]
+      }
+      executable_name = _output_name
+      forward_variables_from(invoker,
+                             [
+                               "extra_substitutions",
+                               "info_plist",
+                               "info_plist_target",
+                             ])
+    }
+
+    bundle_data(_bundle_data_info_plist) {
+      visibility = [ ":$_target_name" ]
+      forward_variables_from(invoker, [ "testonly" ])
+      sources = get_target_outputs(":$_generate_info_plist")
+      outputs = [
+        "{{bundle_root_dir}}/Info.plist",
+      ]
+      public_deps = [
+        ":$_generate_info_plist",
+      ]
+    }
+
+    if (use_ios_simulator) {
+      action(_generate_entitlements_target) {
+        _gen_info_plist_target = ":$_generate_info_plist"
+        _gen_info_plist_outputs = get_target_outputs(_gen_info_plist_target)
+        _info_plist_path = _gen_info_plist_outputs[0]
+
+        script = _code_signing_script_path
+        deps = [
+          _gen_info_plist_target,
+        ]
+        sources = [
+          _entitlements_path,
+          _info_plist_path,
+        ]
+        outputs = [
+          _generate_entitlements_output,
+        ]
+        args = [
+                 "generate-entitlements",
+                 "-e=" + rebase_path(_entitlements_path, root_build_dir),
+                 "-p=" + rebase_path(_info_plist_path, root_build_dir),
+               ] + rebase_path(outputs, root_build_dir)
+      }
+    }
+
+    _link_executable = _target_name + "_arch_executable"
+    _lipo_executable = _target_name + "_executable"
+
+    _link_executable_visibility = [ ":$_lipo_executable" ]
+    _lipo_executable_visibility = [ ":$_target_name" ]
+
+    executable(_link_executable) {
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "bundle_deps",
+                               "bundle_deps_filter",
+                               "bundle_extension",
+                               "data_deps",
+                               "entitlements_path",
+                               "extra_substitutions",
+                               "extra_system_frameworks",
+                               "info_plist",
+                               "info_plist_target",
+                               "output_name",
+                               "product_type",
+                               "visibility",
+                             ])
+
+      visibility = _link_executable_visibility
+
+      output_name = _output_name
+      output_prefix_override = true
+      output_dir = "$target_out_dir/$current_cpu"
+
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += _executable_extra_deps
+
+      if (!defined(ldflags)) {
+        ldflags = []
+      }
+      ldflags += _executable_extra_ldflags
+
+      if (!defined(inputs)) {
+        inputs = []
+      }
+      inputs += _executable_extra_inputs
+
+      if (!defined(libs)) {
+        libs = []
+      }
+      libs += [ "UIKit.framework" ]
+    }
+
+    # Create the multi-architecture binary from all the single architecture
+    # binaries using "lipo". This target exists for the default toolchain
+    # of a fat-build only and depends on the expansion of "ios_app_bundle"
+    # for the other toolchains (i.e. a single "executable" target).
+    #
+    # This action only happens once per "ios_app_bundle" template (for the
+    # main toolchain).
+    action(_lipo_executable) {
+      forward_variables_from(invoker, [ "testonly" ])
+      visibility = _lipo_executable_visibility
+      script = "//build/toolchain/mac/linker_driver.py"
+      outputs = [
+        "$target_out_dir/$_output_name",
+      ]
+      inputs = [
+        "$target_out_dir/$current_cpu/$_output_name",
+      ]
+      deps = [
+        ":$_link_executable",
+      ]
+      foreach(_additional_toolchain, additional_toolchains) {
+        _additional_toolchain_target = "$_target_name($_additional_toolchain)"
+        deps += [ ":$_additional_toolchain_target" ]
+        inputs += [ get_label_info(_additional_toolchain_target,
+                                   "root_out_dir") + "/$_output_name" ]
+      }
+      args = [
+               "xcrun",
+               "lipo",
+               "-create",
+               "-output",
+               rebase_path(outputs[0], root_build_dir),
+             ] + rebase_path(inputs, root_build_dir)
+
+      if (enable_dsyms) {
+        _dsyms_dir = "$root_out_dir/$_output_name.dSYM/"
+        outputs += [
+          "$_dsyms_dir/",
+          "$_dsyms_dir/Contents/Info.plist",
+          "$_dsyms_dir/Contents/Resources/DWARF/$_output_name",
+        ]
+        args +=
+            [ "-Wcrl,dsym," + rebase_path("$root_out_dir/.", root_build_dir) ]
+      }
+
+      if (enable_stripping) {
+        # Check whether //build/config/mac:strip_all has been removed from
+        # the configs variable (as this is how stripping is disabled for a
+        # single target).
+        _strip_all_in_config = false
+        if (defined(invoker.configs)) {
+          foreach(_config, invoker.configs) {
+            if (_config == "//build/config/mac:strip_all") {
+              _strip_all_in_config = true
+            }
+          }
+        }
+
+        if (_strip_all_in_config) {
+          args += [ "-Wcrl,strip,-x,-S" ]
+
+          if (save_unstripped_output) {
+            outputs += [ outputs[0] + ".unstripped" ]
+            args += [ "-Wcrl,unstripped," +
+                      rebase_path(get_path_info(outputs[0], "dir"),
+                                  root_build_dir) ]
+          }
+        }
+      }
+    }
+
+    create_bundle(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "bundle_deps_filter",
+                               "data_deps",
+                               "deps",
+                               "public_deps",
+                               "testonly",
+                               "visibility",
+                             ])
+
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += [ ":$_bundle_data_info_plist" ]
+      if (!defined(public_deps)) {
+        public_deps = []
+      }
+      public_deps += [ ":$_lipo_executable" ]
+      if (defined(invoker.bundle_deps)) {
+        deps += invoker.bundle_deps
+      }
+
+      if (use_ios_simulator) {
+        if (!defined(data_deps)) {
+          data_deps = []
+        }
+        data_deps += [ "//testing/iossim" ]
+      }
+
+      if (defined(invoker.product_type)) {
+        product_type = invoker.product_type
+      } else {
+        product_type = "com.apple.product-type.application"
+      }
+
+      if (defined(invoker.bundle_extension)) {
+        _bundle_extension = invoker.bundle_extension
+      } else {
+        _bundle_extension = ".app"
+      }
+
+      bundle_root_dir = "$root_out_dir/$_output_name$_bundle_extension"
+      bundle_resources_dir = bundle_root_dir
+      bundle_executable_dir = bundle_root_dir
+      bundle_plugins_dir = "$bundle_root_dir/PlugIns"
+
+      code_signing_script = _code_signing_script_path
+      code_signing_sources = [
+        _entitlements_path,
+        "$target_out_dir/$_output_name",
+      ]
+      code_signing_outputs = [ "$bundle_root_dir/$_output_name" ]
+      if (ios_enable_code_signing) {
+        code_signing_outputs +=
+            [ "$bundle_root_dir/_CodeSignature/CodeResources" ]
+      }
+      if (ios_code_signing_identity != "") {
+        code_signing_outputs += [ "$bundle_root_dir/embedded.mobileprovision" ]
+      }
+      if (defined(invoker.extra_system_frameworks)) {
+        foreach(_framework, invoker.extra_system_frameworks) {
+          code_signing_outputs += [ "$bundle_root_dir/Frameworks/" +
+                                    get_path_info(_framework, "file") ]
+        }
+      }
+      code_signing_args = [
+        "code-sign-bundle",
+        "-t=" + ios_sdk_name,
+        "-i=" + ios_code_signing_identity,
+        "-e=" + rebase_path(_entitlements_path, root_build_dir),
+        "-b=" + rebase_path("$target_out_dir/$_output_name", root_build_dir),
+        rebase_path(bundle_root_dir, root_build_dir),
+      ]
+      if (defined(invoker.extra_system_frameworks)) {
+        # All framework in extra_system_frameworks are expected to be
+        # system framework and the path to be already system absolute
+        # so do not use rebase_path here.
+        foreach(_framework, invoker.extra_system_frameworks) {
+          code_signing_args += [ "-F=" + _framework ]
+        }
+      }
+      if (!ios_enable_code_signing) {
+        code_signing_args += [ "--disable-code-signature" ]
+      }
+    }
+  }
+
+  # TODO(crbug.com/395883): ensure those variables are marked as used to
+  # avoid errors while running "gn gen".
+  if (defined(invoker.entitlements_path)) {
+    assert(invoker.entitlements_path != "",
+           "mark invoker.entitlements_path as used")
+  }
+  if (defined(invoker.bundle_extension)) {
+    assert(invoker.bundle_extension != "",
+           "mark invoker.bundle_extension as used")
+  }
+  if (defined(invoker.bundle_extension)) {
+    assert(invoker.bundle_extension != "",
+           "mark invoker.bundle_extension as used")
+  }
+  if (defined(invoker.entitlements_path)) {
+    assert(invoker.entitlements_path != "",
+           "mark invoker.entitlements_path as used")
+  }
+  if (defined(invoker.extra_substitutions)) {
+    assert(invoker.extra_substitutions != [],
+           "mark invoker.extra_substitutions as used")
+  }
+  if (defined(invoker.info_plist)) {
+    assert(invoker.info_plist != "", "mark invoker.info_plist as used")
+  }
+  if (defined(invoker.info_plist_target)) {
+    assert(invoker.info_plist_target != "",
+           "mark invoker.info_plist_target as used")
+  }
+  if (defined(invoker.product_type)) {
+    assert(invoker.product_type != "", "mark product_type as used")
+  }
+  if (defined(invoker.bundle_deps)) {
+    assert(invoker.bundle_deps != [], "mark bundle_deps as used")
+  }
+  if (defined(invoker.bundle_deps_filter)) {
+    assert(invoker.bundle_deps_filter != [], "mark bundle_deps_filter as used")
+  }
+}
+
+set_defaults("ios_app_bundle") {
+  configs = default_executable_configs
+}
+
+# Template to build an application extension bundle for iOS.
+#
+# This should be used instead of "executable" built-in target type on iOS.
+# As the template forward the generation of the application executable to
+# an "executable" target, all arguments supported by "executable" targets
+# are also supported by this template.
+#
+# Arguments
+#
+#   output_name:
+#       (optional) string, name of the generated application, if omitted,
+#       defaults to the target_name.
+#
+#   extra_substitutions:
+#       (optional) list of string in "key=value" format, each value will
+#       be used as an additional variable substitution rule when generating
+#       the application Info.plist
+#
+#   info_plist:
+#       (optional) string, path to the Info.plist file that will be used for
+#       the bundle.
+#
+#   info_plist_target:
+#       (optional) string, if the info_plist is generated from an action,
+#       rather than a regular source file, specify the target name in lieu
+#       of info_plist. The two arguments are mutually exclusive.
+#
+# For more information, see "gn help executable".
+template("ios_appex_bundle") {
+  ios_app_bundle(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "bundle_extension",
+                             "product_type",
+                           ])
+    bundle_extension = ".appex"
+    product_type = "com.apple.product-type.app-extension"
+
+    # Add linker flags required for an application extension (determined by
+    # inspecting the link command-line when using Xcode 9.0+).
+    if (!defined(ldflags)) {
+      ldflags = []
+    }
+    ldflags += [
+      "-e",
+      "_NSExtensionMain",
+      "-fapplication-extension",
+    ]
+  }
+}
+
+set_defaults("ios_appex_bundle") {
+  configs = default_executable_configs
+}
+
+# Compile a xib or storyboard file and add it to a bundle_data so that it is
+# available at runtime in the bundle.
+#
+# Arguments
+#
+#   source:
+#       string, path of the xib or storyboard to compile.
+#
+# Forwards all variables to the bundle_data target.
+template("bundle_data_xib") {
+  assert(defined(invoker.source), "source needs to be defined for $target_name")
+
+  _source_extension = get_path_info(invoker.source, "extension")
+  assert(_source_extension == "xib" || _source_extension == "storyboard",
+         "source must be a .xib or .storyboard for $target_name")
+
+  _target_name = target_name
+  _compile_xib = target_name + "_compile_xib"
+
+  compile_xibs(_compile_xib) {
+    sources = [
+      invoker.source,
+    ]
+    visibility = [ ":$_target_name" ]
+    ibtool_flags = [
+      "--minimum-deployment-target",
+      ios_deployment_target,
+      "--auto-activate-custom-fonts",
+      "--target-device",
+      "iphone",
+      "--target-device",
+      "ipad",
+    ]
+  }
+
+  bundle_data(_target_name) {
+    forward_variables_from(invoker, "*", [ "source" ])
+
+    if (!defined(public_deps)) {
+      public_deps = []
+    }
+    public_deps += [ ":$_compile_xib" ]
+
+    sources = get_target_outputs(":$_compile_xib")
+
+    outputs = [
+      "{{bundle_resources_dir}}/{{source_file_part}}",
+    ]
+  }
+}
+
+# Compile a strings file and add it to a bundle_data so that it is available
+# at runtime in the bundle.
+#
+# Arguments
+#
+#   source:
+#       string, path of the strings file to compile.
+#
+#   output:
+#       string, path of the compiled file in the final bundle.
+#
+# Forwards all variables to the bundle_data target.
+template("bundle_data_strings") {
+  assert(defined(invoker.source), "source needs to be defined for $target_name")
+  assert(defined(invoker.output), "output needs to be defined for $target_name")
+
+  _source_extension = get_path_info(invoker.source, "extension")
+  assert(_source_extension == "strings",
+         "source must be a .strings for $target_name")
+
+  _target_name = target_name
+  _convert_target = target_name + "_compile_strings"
+
+  convert_plist(_convert_target) {
+    visibility = [ ":$_target_name" ]
+    source = invoker.source
+    output =
+        "$target_gen_dir/$_target_name/" + get_path_info(invoker.source, "file")
+    format = "binary1"
+  }
+
+  bundle_data(_target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "source",
+                             "output",
+                           ])
+
+    if (!defined(public_deps)) {
+      public_deps = []
+    }
+    public_deps += [ ":$_convert_target" ]
+
+    sources = get_target_outputs(":$_convert_target")
+
+    outputs = [
+      invoker.output,
+    ]
+  }
+}
+
+# Template to package a shared library into an iOS framework bundle.
+#
+# By default, the bundle target this template generates does not link the
+# resulting framework into anything that depends on it. If a dependency wants
+# a link-time (as well as build-time) dependency on the framework bundle,
+# depend against "$target_name+link". If only the build-time dependency is
+# required (e.g., for copying into another bundle), then use "$target_name".
+#
+# Arguments
+#
+#     output_name:
+#         (optional) string, name of the generated framework without the
+#         .framework suffix. If omitted, defaults to target_name.
+#
+#     framework_version:
+#         (optional) string, version of the framework. Typically this is a
+#         single letter, like "A". If omitted, the Versions/ subdirectory
+#         structure will not be created, and build output will go directly
+#         into the framework subdirectory.
+#
+#     public_headers:
+#         (optional) list of paths to header file that needs to be copied
+#         into the framework bundle Headers subdirectory. If omitted or
+#         empty then the Headers subdirectory is not created.
+#
+#     sources
+#         (optional) list of files. Needs to be defined and non-empty if
+#         public_headers is defined and non-empty.
+#
+# This template provides two targets for the resulting framework bundle. The
+# link-time behavior varies depending on which of the two targets below is
+# added as a dependency:
+#   - $target_name only adds a build-time dependency. Targets that depend on
+#     it will not link against the framework.
+#   - $target_name+link adds a build-time and link-time dependency. Targets
+#     that depend on it will link against the framework.
+#
+# The build-time-only dependency is used for when a target needs to use the
+# framework either only for resources, or because the target loads it at run-
+# time, via dlopen() or NSBundle. The link-time dependency will cause the
+# dependee to have the framework loaded by dyld at launch.
+#
+# Example of build-time only dependency:
+#
+#     framework_bundle("CoreTeleportation") {
+#       sources = [ ... ]
+#     }
+#
+#     bundle_data("core_teleportation_bundle_data") {
+#       deps = [ ":CoreTeleportation" ]
+#       sources = [ "$root_out_dir/CoreTeleportation.framework" ]
+#       outputs = [ "{{bundle_root_dir}}/Frameworks/{{source_file_part}}" ]
+#     }
+#
+#     app_bundle("GoatTeleporter") {
+#       sources = [ ... ]
+#       deps = [
+#         ":core_teleportation_bundle_data",
+#       ]
+#     }
+#
+# The GoatTeleporter.app will not directly link against
+# CoreTeleportation.framework, but it will be included in the bundle's
+# Frameworks directory.
+#
+# Example of link-time dependency:
+#
+#     framework_bundle("CoreTeleportation") {
+#       sources = [ ... ]
+#       ldflags = [
+#         "-install_name",
+#         "@executable_path/../Frameworks/$target_name.framework"
+#       ]
+#     }
+#
+#     bundle_data("core_teleportation_bundle_data") {
+#       deps = [ ":CoreTeleportation+link" ]
+#       sources = [ "$root_out_dir/CoreTeleportation.framework" ]
+#       outputs = [ "{{bundle_root_dir}}/Frameworks/{{source_file_part}}" ]
+#     }
+#
+#     app_bundle("GoatTeleporter") {
+#       sources = [ ... ]
+#       deps = [
+#         ":core_teleportation_bundle_data",
+#       ]
+#     }
+#
+# Note that the framework is still copied to the app's bundle, but dyld will
+# load this library when the app is launched because it uses the "+link"
+# target as a dependency. This also requires that the framework set its
+# install_name so that dyld can locate it.
+#
+# See "gn help shared_library" for more information on arguments supported
+# by shared library target.
+template("ios_framework_bundle") {
+  _target_name = target_name
+  _output_name = target_name
+  if (defined(invoker.output_name)) {
+    _output_name = invoker.output_name
+  }
+
+  _has_public_headers =
+      defined(invoker.public_headers) && invoker.public_headers != []
+
+  if (_has_public_headers) {
+    _framework_headers_target = _target_name + "_framework_headers"
+    _framework_headers_config = _target_name + "_framework_headers_config"
+    _headers_map_config = _target_name + "_headers_map"
+  }
+
+  # The expansion of the template is different for fat and thin builds. For
+  # thin build (and default toolchain of a fat build), the template expands
+  # to a "shared_library" target to create the bundle shared library and a
+  # "create_bundle" target (the main target) to create the bundle structure.
+  #
+  # For a fat build, the template just expands to the "shared_library" target
+  # for the non-default toolchain, while the final library is created using
+  # "lipo" in the expansion of the template for the default toolchain.
+  #
+  # The "$target_name+link" group for the non-default toolchain depends on the
+  # target of the same name from the default toolchain as this is the target
+  # that defines the real framework bundle (it will support the current cpu
+  # as it is a fat framework).
+
+  if (_is_secondary_build) {
+    shared_library(_target_name) {
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "assert_no_deps",
+                               "bundle_deps",
+                               "data_deps",
+                               "enable_code_signing",
+                               "info_plist",
+                               "info_plist_target",
+                               "output_name",
+                             ])
+      if (defined(visibility)) {
+        visibility += [ ":${_target_name}_shared_library($default_toolchain)" ]
+      }
+      output_name = _output_name
+      output_prefix_override = true
+      output_extension = ""
+      output_dir = "$target_out_dir/$_target_name"
+
+      if (_has_public_headers) {
+        configs += [
+          ":$_framework_headers_config($default_toolchain)",
+          ":$_headers_map_config($default_toolchain)",
+        ]
+
+        if (!defined(deps)) {
+          deps = []
+        }
+        deps += [ ":$_framework_headers_target($default_toolchain)" ]
+      }
+    }
+
+    group(_target_name + "+link") {
+      forward_variables_from(invoker,
+                             [
+                               "visibility",
+                               "testonly",
+                             ])
+      public_deps = [
+        ":$_target_name+link($default_toolchain)",
+      ]
+    }
+
+    if (defined(invoker.bundle_deps)) {
+      assert(invoker.bundle_deps != [], "mark bundle_deps as used")
+    }
+  } else {
+    if (_has_public_headers) {
+      _public_headers = invoker.public_headers
+      _framework_name = _output_name + ".framework"
+      _framework_root = "$root_out_dir/$_framework_name"
+
+      _header_map_filename = "$target_gen_dir/$_output_name.headers.hmap"
+
+      _compile_headers_map_target = _target_name + "_compile_headers_map"
+      action(_compile_headers_map_target) {
+        visibility = [ ":$_framework_headers_target" ]
+        script = "//build/config/ios/write_framework_hmap.py"
+        outputs = [
+          _header_map_filename,
+        ]
+
+        # The header map generation only wants the list of headers, not all of
+        # sources, so filter any non-header source files from "sources". It is
+        # less error prone that having the developer duplicate the list of all
+        # headers in addition to "sources".
+        set_sources_assignment_filter([
+                                        "*.c",
+                                        "*.cc",
+                                        "*.cpp",
+                                        "*.m",
+                                        "*.mm",
+                                      ])
+        sources = invoker.sources
+        set_sources_assignment_filter([])
+
+        args = [
+                 rebase_path(_header_map_filename),
+                 rebase_path(_framework_root, root_build_dir),
+               ] + rebase_path(sources, root_build_dir)
+      }
+
+      _create_module_map_target = _target_name + "_module_map"
+      action(_create_module_map_target) {
+        visibility = [ ":$_framework_headers_target" ]
+        script = "//build/config/ios/write_framework_modulemap.py"
+        outputs = [
+          "$_framework_root/Modules/module.modulemap",
+        ]
+        args = [ rebase_path("$_framework_root", root_build_dir) ]
+      }
+
+      _copy_public_headers_target = _target_name + "_copy_public_headers"
+      copy(_copy_public_headers_target) {
+        visibility = [ ":$_framework_headers_target" ]
+        sources = _public_headers
+        outputs = [
+          "$_framework_root/Headers/{{source_file_part}}",
+        ]
+      }
+
+      config(_headers_map_config) {
+        visibility = [ ":$_target_name" ]
+        include_dirs = [ _header_map_filename ]
+        ldflags = [
+          "-install_name",
+          "@rpath/$_framework_name/$_output_name",
+        ]
+      }
+
+      group(_framework_headers_target) {
+        deps = [
+          ":$_compile_headers_map_target",
+          ":$_copy_public_headers_target",
+          ":$_create_module_map_target",
+        ]
+      }
+
+      config(_framework_headers_config) {
+        # The link settings are inherited from the framework_bundle config.
+        cflags = [
+          "-F",
+          rebase_path("$root_out_dir/.", root_build_dir),
+        ]
+      }
+    }
+
+    # If the framework is unversioned, the final _target_name will be the
+    # create_bundle(_framework_target), otherwise an action with the name
+    # _target_name will depends on the the create_bundle() in order to prepare
+    # the versioned directory structure.
+    _framework_target = _target_name
+    _framework_name = _output_name + ".framework"
+    _framework_root_dir = "$root_out_dir/$_framework_name"
+    if (defined(invoker.framework_version) && invoker.framework_version != "") {
+      _framework_version = invoker.framework_version
+      _framework_root_dir += "/Versions/$_framework_version"
+      _framework_target = _target_name + "_create_bundle"
+    }
+
+    _link_shared_library_target = target_name + "_arch_shared_library"
+    _lipo_shared_library_target = target_name + "_shared_library"
+
+    _lipo_shared_library_visibility = [ ":$_framework_target" ]
+    _link_shared_library_visibility = [ ":$_lipo_shared_library_target" ]
+
+    _arch_shared_library_dir = "$target_out_dir/$_link_shared_library_target"
+    _shared_library_dir = "$target_out_dir/$_lipo_shared_library_target"
+
+    shared_library(_link_shared_library_target) {
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "assert_no_deps",
+                               "bundle_deps",
+                               "data_deps",
+                               "enable_code_signing",
+                               "info_plist",
+                               "info_plist_target",
+                               "output_name",
+                               "visibility",
+                             ])
+      visibility = _link_shared_library_visibility
+      output_name = _output_name
+      output_prefix_override = true
+      output_extension = ""
+      output_dir = _arch_shared_library_dir
+
+      if (_has_public_headers) {
+        configs += [ ":$_headers_map_config($default_toolchain)" ]
+
+        if (!defined(deps)) {
+          deps = []
+        }
+        deps += [ ":$_framework_headers_target($default_toolchain)" ]
+      }
+    }
+
+    action(_lipo_shared_library_target) {
+      forward_variables_from(invoker, [ "testonly" ])
+      visibility = _lipo_shared_library_visibility
+      script = "//build/toolchain/mac/linker_driver.py"
+      outputs = [
+        "$_shared_library_dir/$_output_name",
+      ]
+      inputs = [
+        "$_arch_shared_library_dir/$_output_name",
+      ]
+      deps = [
+        ":$_link_shared_library_target",
+      ]
+      foreach(_additional_toolchain, additional_toolchains) {
+        _additional_toolchain_target = "$_target_name($_additional_toolchain)"
+        deps += [ ":$_additional_toolchain_target" ]
+        inputs += [ get_label_info(_additional_toolchain_target,
+                                   "target_out_dir") + "/$_output_name" ]
+      }
+      args = [
+               "xcrun",
+               "lipo",
+               "-create",
+               "-output",
+               rebase_path(outputs[0], root_build_dir),
+             ] + rebase_path(inputs, root_build_dir)
+
+      if (enable_dsyms) {
+        _dsyms_dir = "$root_out_dir/$_output_name.dSYM/"
+        outputs += [
+          "$_dsyms_dir/",
+          "$_dsyms_dir/Contents/Info.plist",
+          "$_dsyms_dir/Contents/Resources/DWARF/$_output_name",
+        ]
+        args +=
+            [ "-Wcrl,dsym," + rebase_path("$root_out_dir/.", root_build_dir) ]
+      }
+
+      if (enable_stripping) {
+        # Check whether //build/config/mac:strip_all has been removed from
+        # the configs variable (as this is how stripping is disabled for a
+        # single target).
+        _strip_all_in_config = false
+        if (defined(invoker.configs)) {
+          foreach(_config, invoker.configs) {
+            if (_config == "//build/config/mac:strip_all") {
+              _strip_all_in_config = true
+            }
+          }
+        }
+
+        if (_strip_all_in_config) {
+          args += [ "-Wcrl,strip,-x,-S" ]
+
+          if (save_unstripped_output) {
+            outputs += [ outputs[0] + ".unstripped" ]
+            args += [ "-Wcrl,unstripped," +
+                      rebase_path(get_path_info(outputs[0], "dir"),
+                                  root_build_dir) ]
+          }
+        }
+      }
+    }
+
+    _framework_public_config = _target_name + "_public_config"
+    config(_framework_public_config) {
+      # TODO(sdefresne): should we have a framework_dirs similar to lib_dirs
+      # and include_dirs to avoid duplicate values on the command-line.
+      visibility = [ ":$_framework_target" ]
+      ldflags = [
+        "-F",
+        rebase_path("$root_out_dir/.", root_build_dir),
+      ]
+      lib_dirs = [ root_out_dir ]
+      libs = [ _framework_name ]
+    }
+
+    _info_plist_target = _target_name + "_info_plist"
+    _info_plist_bundle = _target_name + "_info_plist_bundle"
+    ios_info_plist(_info_plist_target) {
+      visibility = [ ":$_info_plist_bundle" ]
+      executable_name = _output_name
+      forward_variables_from(invoker,
+                             [
+                               "extra_substitutions",
+                               "info_plist",
+                               "info_plist_target",
+                             ])
+    }
+
+    bundle_data(_info_plist_bundle) {
+      visibility = [ ":$_target_name" ]
+      forward_variables_from(invoker, [ "testonly" ])
+      sources = get_target_outputs(":$_info_plist_target")
+      outputs = [
+        "{{bundle_root_dir}}/Info.plist",
+      ]
+      public_deps = [
+        ":$_info_plist_target",
+      ]
+    }
+
+    create_bundle(_framework_target) {
+      forward_variables_from(invoker,
+                             [
+                               "data_deps",
+                               "deps",
+                               "public_configs",
+                               "public_deps",
+                               "testonly",
+                             ])
+
+      if (defined(_framework_version)) {
+        visibility = [ ":$_target_name" ]
+      } else {
+        if (defined(invoker.visibility)) {
+          visibility = invoker.visibility
+          visibility += [ ":$_target_name+link" ]
+        }
+      }
+
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += [ ":$_info_plist_bundle" ]
+
+      if (defined(invoker.bundle_deps)) {
+        if (!defined(deps)) {
+          deps = []
+        }
+        deps += invoker.bundle_deps
+      }
+
+      bundle_root_dir = _framework_root_dir
+      bundle_resources_dir = _framework_root_dir
+      bundle_executable_dir = _framework_root_dir
+
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += [ ":$_lipo_shared_library_target" ]
+
+      _entitlements_path = _default_entitlements_path
+      if (defined(invoker.entitlements_path)) {
+        _entitlements_path = invoker.entitlements_path
+      }
+
+      _ios_enable_code_signing = ios_enable_code_signing
+      if (defined(invoker.enable_code_signing)) {
+        _ios_enable_code_signing = invoker.enable_code_signing
+      }
+
+      code_signing_script = _code_signing_script_path
+      code_signing_sources = [
+        _entitlements_path,
+        "$_shared_library_dir/$_output_name",
+      ]
+      code_signing_outputs = [ "$bundle_root_dir/$_output_name" ]
+      if (_ios_enable_code_signing) {
+        code_signing_outputs +=
+            [ "$bundle_root_dir/_CodeSignature/CodeResources" ]
+      }
+      if (ios_code_signing_identity != "") {
+        code_signing_outputs += [ "$bundle_root_dir/embedded.mobileprovision" ]
+      }
+      code_signing_args = [
+        "code-sign-bundle",
+        "-t=" + ios_sdk_name,
+        "-i=" + ios_code_signing_identity,
+        "-e=" + rebase_path(_entitlements_path, root_build_dir),
+        "-b=" +
+            rebase_path("$_shared_library_dir/$_output_name", root_build_dir),
+        rebase_path(bundle_root_dir, root_build_dir),
+      ]
+      if (!_ios_enable_code_signing) {
+        code_signing_args += [ "--disable-code-signature" ]
+      }
+    }
+
+    if (defined(_framework_version)) {
+      action(_target_name) {
+        forward_variables_from(invoker, [ "testonly" ])
+
+        if (defined(invoker.visibility)) {
+          visibility = invoker.visibility
+          visibility += [ ":$_target_name+link" ]
+        }
+
+        script = "//build/config/mac/package_framework.py"
+        outputs = [
+          "$root_out_dir/$_framework_name/Versions/Current",
+        ]
+        args = [
+          "$_framework_name",
+          "$_framework_version",
+        ]
+        public_deps = [
+          ":$_framework_target",
+        ]
+      }
+    }
+
+    group(_target_name + "+link") {
+      forward_variables_from(invoker,
+                             [
+                               "public_deps",
+                               "public_configs",
+                               "testonly",
+                               "visibility",
+                             ])
+      if (!defined(public_deps)) {
+        public_deps = []
+      }
+      public_deps += [ ":$_target_name" ]
+      if (!defined(public_configs)) {
+        public_configs = []
+      }
+      public_configs += [ ":$_framework_public_config" ]
+
+      if (_has_public_headers) {
+        public_configs += [ ":$_framework_headers_config" ]
+      }
+    }
+
+    bundle_data(_target_name + "+bundle") {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      public_deps = [
+        ":$_target_name",
+      ]
+      sources = [
+        "$root_out_dir/$_output_name.framework",
+      ]
+      outputs = [
+        "{{bundle_resources_dir}}/Frameworks/$_output_name.framework",
+      ]
+    }
+  }
+}
+
+set_defaults("ios_framework_bundle") {
+  configs = default_shared_library_configs
+}
+
+# For Chrome on iOS we want to run XCTests for all our build configurations
+# (Debug, Release, ...). In addition, the symbols visibility is configured to
+# private by default. To simplify testing with those constraints, our tests are
+# compiled in the TEST_HOST target instead of the .xctest bundle.
+template("ios_xctest_test") {
+  _target_name = target_name
+  _output_name = target_name
+  if (defined(invoker.output_name)) {
+    _output_name = invoker.output_name
+  }
+
+  _xctest_target = _target_name
+  _xctest_output = _output_name
+
+  _host_target = _target_name + "_host"
+  _host_output = _output_name + "_host"
+
+  if (_is_secondary_build) {
+    loadable_module(_xctest_target) {
+      visibility = [ ":${_xctest_target}_loadable_module($default_toolchain)" ]
+      sources = [
+        "//build/config/ios/xctest_shell.mm",
+      ]
+      configs += [ "//build/config/ios:xctest_config" ]
+
+      output_name = _xctest_output
+      output_extension = ""
+    }
+  } else {
+    _xctest_info_plist_target = _xctest_target + "_info_plist"
+    _xctest_info_plist_bundle = _xctest_target + "_info_plist_bundle"
+    ios_info_plist(_xctest_info_plist_target) {
+      visibility = [ ":$_xctest_info_plist_bundle" ]
+      info_plist = "//build/config/ios/Module-Info.plist"
+      executable_name = _output_name
+    }
+
+    bundle_data(_xctest_info_plist_bundle) {
+      visibility = [ ":$_xctest_target" ]
+      public_deps = [
+        ":$_xctest_info_plist_target",
+      ]
+      sources = get_target_outputs(":$_xctest_info_plist_target")
+      outputs = [
+        "{{bundle_root_dir}}/Info.plist",
+      ]
+    }
+
+    _xctest_loadable_module_target = _xctest_target + "_arch_loadable_module"
+    _xctest_lipo_loadable_module_target = _xctest_target + "_loadable_module"
+
+    _xctest_loadable_module_visibility =
+        [ ":$_xctest_lipo_loadable_module_target" ]
+    _xctest_lipo_loadable_module_visibility = [ ":$_xctest_target" ]
+
+    loadable_module(_xctest_loadable_module_target) {
+      visibility = _xctest_loadable_module_visibility
+      sources = [
+        "//build/config/ios/xctest_shell.mm",
+      ]
+      configs += [ "//build/config/ios:xctest_config" ]
+
+      output_dir = "$target_out_dir/$current_cpu"
+      output_name = _xctest_output
+      output_prefix_override = true
+      output_extension = ""
+    }
+
+    action(_xctest_lipo_loadable_module_target) {
+      visibility = _xctest_lipo_loadable_module_visibility
+      script = "//build/toolchain/mac/linker_driver.py"
+      outputs = [
+        "$target_out_dir/$_xctest_output",
+      ]
+      inputs = [
+        "$target_out_dir/$current_cpu/$_xctest_output",
+      ]
+      deps = [
+        ":$_xctest_loadable_module_target",
+      ]
+      foreach(_additional_toolchain, additional_toolchains) {
+        _additional_toolchain_target = "$_target_name($_additional_toolchain)"
+        deps += [ ":$_additional_toolchain_target" ]
+        inputs += [ get_label_info(_additional_toolchain_target,
+                                   "root_out_dir") + "/$_xctest_output" ]
+      }
+      args = [
+               "xcrun",
+               "lipo",
+               "-create",
+               "-output",
+               rebase_path(outputs[0], root_build_dir),
+             ] + rebase_path(inputs, root_build_dir)
+
+      if (enable_dsyms) {
+        _dsyms_dir = "$root_out_dir/$_output_name.dSYM/"
+        outputs += [
+          "$_dsyms_dir/",
+          "$_dsyms_dir/Contents/Info.plist",
+          "$_dsyms_dir/Contents/Resources/DWARF/$_output_name",
+        ]
+        args +=
+            [ "-Wcrl,dsym," + rebase_path("$root_out_dir/.", root_build_dir) ]
+      }
+
+      if (enable_stripping) {
+        # Check whether //build/config/mac:strip_all has been removed from
+        # the configs variable (as this is how stripping is disabled for a
+        # single target).
+        _strip_all_in_config = false
+        if (defined(invoker.configs)) {
+          foreach(_config, invoker.configs) {
+            if (_config == "//build/config/mac:strip_all") {
+              _strip_all_in_config = true
+            }
+          }
+        }
+
+        if (_strip_all_in_config) {
+          args += [ "-Wcrl,strip,-x,-S" ]
+
+          if (save_unstripped_output) {
+            outputs += [ outputs[0] + ".unstripped" ]
+            args += [ "-Wcrl,unstripped," +
+                      rebase_path(get_path_info(outputs[0], "dir"),
+                                  root_build_dir) ]
+          }
+        }
+      }
+    }
+
+    _xctest_bundle = _xctest_target + "_bundle"
+
+    create_bundle(_xctest_target) {
+      visibility = [ ":$_xctest_bundle" ]
+      product_type = "com.apple.product-type.bundle.unit-test"
+      deps = [
+        ":$_xctest_info_plist_bundle",
+        ":$_xctest_lipo_loadable_module_target",
+      ]
+      bundle_root_dir = "$root_out_dir/$_xctest_output.xctest"
+
+      _entitlements_path = _default_entitlements_path
+      if (defined(invoker.entitlements_path)) {
+        _entitlements_path = invoker.entitlements_path
+      }
+
+      code_signing_script = _code_signing_script_path
+      code_signing_sources = [
+        _entitlements_path,
+        "$target_out_dir/$_xctest_output",
+      ]
+      code_signing_outputs = [ "$bundle_root_dir/$_xctest_output" ]
+      if (ios_enable_code_signing) {
+        code_signing_outputs +=
+            [ "$bundle_root_dir/_CodeSignature/CodeResources" ]
+      }
+      if (ios_code_signing_identity != "") {
+        code_signing_outputs += [ "$bundle_root_dir/embedded.mobileprovision" ]
+      }
+      code_signing_args = [
+        "code-sign-bundle",
+        "-t=" + ios_sdk_name,
+        "-i=" + ios_code_signing_identity,
+        "-e=" + rebase_path(_entitlements_path, root_build_dir),
+        "-b=" + rebase_path("$target_out_dir/$_xctest_output", root_build_dir),
+        rebase_path(bundle_root_dir, root_build_dir),
+      ]
+      if (!ios_enable_code_signing) {
+        code_signing_args += [ "--disable-code-signature" ]
+      }
+    }
+
+    bundle_data(_xctest_bundle) {
+      visibility = [ ":$_host_target" ]
+      public_deps = [
+        ":$_xctest_target",
+      ]
+      sources = [
+        "$root_out_dir/$_xctest_output.xctest",
+      ]
+      outputs = [
+        "{{bundle_plugins_dir}}/$_xctest_output.xctest",
+      ]
+    }
+  }
+
+  ios_app_bundle(_host_target) {
+    forward_variables_from(invoker, "*", [ "testonly" ])
+
+    testonly = true
+    output_name = _host_output
+    configs += [ "//build/config/ios:xctest_config" ]
+
+    if (!defined(invoker.info_plist) && !defined(invoker.info_plist_target)) {
+      info_plist = "//build/config/ios/Host-Info.plist"
+    }
+
+    # Xcode needs those two framework installed in the application (and signed)
+    # for the XCTest to run, so install them using extra_system_frameworks.
+    _ios_platform_library = "$ios_sdk_platform_path/Developer/Library"
+    extra_system_frameworks = [
+      "$_ios_platform_library/Frameworks/XCTest.framework",
+      "$_ios_platform_library/PrivateFrameworks/IDEBundleInjection.framework",
+    ]
+
+    if (!_is_secondary_build) {
+      if (!defined(bundle_deps)) {
+        bundle_deps = []
+      }
+      bundle_deps += [ ":$_xctest_bundle" ]
+    }
+
+    if (!defined(ldflags)) {
+      ldflags = []
+    }
+    ldflags += [
+      "-Xlinker",
+      "-rpath",
+      "-Xlinker",
+      "@executable_path/Frameworks",
+      "-Xlinker",
+      "-rpath",
+      "-Xlinker",
+      "@loader_path/Frameworks",
+    ]
+  }
+}
+
+set_defaults("ios_xctest_test") {
+  configs = default_executable_configs
+}

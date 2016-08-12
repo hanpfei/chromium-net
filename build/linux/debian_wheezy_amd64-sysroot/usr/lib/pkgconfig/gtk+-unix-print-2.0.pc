@@ -1,0 +1,14 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=/usr/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+target=x11
+
+gtk_binary_version=2.10.0
+gtk_host=x86_64-pc-linux-gnu
+
+Name: GTK+
+Description: GTK+ Unix print support
+Version: 2.24.10
+Requires: gtk+-${target}-2.0 atk cairo gdk-pixbuf-2.0 gio-2.0 pangoft2
+Cflags: -I${includedir}/gtk-unix-print-2.0
