@@ -106,6 +106,7 @@ group("both_gn_and_gyp") {
   deps = [
     "//base",
     "//url",
+    "//net",
   ]
 
   deps += root_extra_deps
