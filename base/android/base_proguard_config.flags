@@ -1,0 +1,81 @@
+# Keep line number information, useful for stack traces.
+-keepattributes SourceFile,LineNumberTable
+
+# Keep all annotation related attributes that can affect runtime
+-keepattributes RuntimeVisible*Annotations
+-keepattributes AnnotationDefault
+
+# Keep the annotations, because if we don't, the ProGuard rules that use them
+# will not be respected. These classes then show up in our final dex, which we
+# do not want - see crbug.com/628226.
+-keep @interface org.chromium.base.annotations.AccessedByNative
+-keep @interface org.chromium.base.annotations.CalledByNative
+-keep @interface org.chromium.base.annotations.CalledByNativeUnchecked
+-keep @interface org.chromium.base.annotations.RemovableInRelease
+-keep @interface org.chromium.base.annotations.UsedByReflection
+
+# Keeps for class level annotations.
+-keep @org.chromium.base.annotations.UsedByReflection class *
+
+# Keeps for method level annotations.
+-keepclasseswithmembers class * {
+  @android.webkit.JavascriptInterface <methods>;
+}
+-keepclasseswithmembers class * {
+  @org.chromium.base.annotations.AccessedByNative <fields>;
+}
+-keepclasseswithmembers,includedescriptorclasses class * {
+  @org.chromium.base.annotations.CalledByNative <methods>;
+}
+-keepclasseswithmembers,includedescriptorclasses class * {
+  @org.chromium.base.annotations.CalledByNativeUnchecked <methods>;
+}
+-keepclasseswithmembers class * {
+  @org.chromium.base.annotations.UsedByReflection <methods>;
+}
+-keepclasseswithmembers,includedescriptorclasses class * {
+  native <methods>;
+}
+
+# Remove methods annotated with this if their return value is unused
+-assumenosideeffects class ** {
+  @org.chromium.base.annotations.RemovableInRelease <methods>;
+}
+
+# Allows Proguard freedom in removing these log related calls. We ask for debug
+# and verbose logs to be stripped out in base.Log, so we are just ensuring we
+# get rid of all other debug/verbose logs.
+-assumenosideeffects class android.util.Log {
+  static *** d(...);
+  static *** v(...);
+  static *** isLoggable(...);
+}
+
+# The following chart was created on July 20, 2016, to decide on 3 optimization
+# passes.
+# optimization passes | time | .dex size | dirty memory per process
+# -----------------------------------------------------------------
+#          1          | 0:48 |  5805676  |         488972
+#          2          | 1:07 |  5777376  |         487092
+#          3          | 1:24 |  5772192  |         486596
+#          4          | 1:42 |  5771124  |         486484
+#          5          | 1:56 |  5770504  |         486432
+-optimizationpasses 3
+
+# Class merging provides negligible .dex size reduction and method count
+# reduction (about 0.3% improvement on method count, and 0.1% savings on size),
+# and it messes up stack traces if the classes are optimized. Thus, it is in our
+# best interests to turn it off. See crbug.com/620323
+-optimizations !class/merging/*
+
+# Allowing Proguard to change modifiers. This change shrinks the .dex size by
+# ~1.1%, and reduces the method count by ~4.3%.
+-allowaccessmodification
+
+# Keep all enum values and valueOf methods. See
+# http://proguard.sourceforge.net/index.html#manual/examples.html
+# for the reason for this. Also, see http://crbug.com/248037.
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
