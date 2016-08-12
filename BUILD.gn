@@ -105,6 +105,7 @@ group("both_gn_and_gyp") {
   testonly = true
   deps = [
     "//base",
+    "//url",
   ]
 
   deps += root_extra_deps

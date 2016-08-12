@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/buildflag_header.gni")
-import("//testing/test.gni")
 import("features.gni")
 
 if (is_android) {
@@ -113,61 +112,3 @@ if (is_android) {
   }
 }
 
-test("url_unittests") {
-  sources = [
-    "gurl_unittest.cc",
-    "origin_unittest.cc",
-    "run_all_unittests.cc",
-    "scheme_host_port_unittest.cc",
-    "url_canon_icu_unittest.cc",
-    "url_canon_unittest.cc",
-    "url_parse_unittest.cc",
-    "url_test_utils.h",
-    "url_util_unittest.cc",
-  ]
-
-  deps = [
-    ":url",
-    "//base",
-    "//base/test:test_support",
-    "//testing/gtest",
-  ]
-
-  if (!is_ios) {
-    sources += [ "mojo/url_gurl_struct_traits_unittest.cc" ]
-  }
-
-  if (use_platform_icu_alternatives) {
-    # Unit tests that are not supported by the current ICU alternatives on Android.
-    if (is_android) {
-      sources -= [
-        "url_canon_icu_unittest.cc",
-        "url_canon_unittest.cc",
-      ]
-      deps += [ ":url_java" ]
-    }
-
-    # Unit tests that are not supported by the current ICU alternatives on iOS.
-    if (is_ios) {
-      sources -= [
-        "origin_unittest.cc",
-        "scheme_host_port_unittest.cc",
-        "url_canon_icu_unittest.cc",
-        "url_canon_unittest.cc",
-      ]
-    }
-  } else {  # !use_platform_icu_alternatives
-    deps += [ "//third_party/icu:icuuc" ]
-  }
-
-  # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
-  configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
-
-  if (!is_ios) {
-    deps += [
-      "//mojo/edk/system",
-      "//mojo/edk/test:test_support",
-      "//url/mojo:test_url_mojom_gurl",
-    ]
-  }
-}
