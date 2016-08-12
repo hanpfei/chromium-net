@@ -6,6 +6,9 @@
 .project
 .settings
 .tags
+*.so
+*.so.TOC
+*.dat
 
 
 out/Default/.ninja_deps
