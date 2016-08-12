@@ -42,8 +42,8 @@ declare_args() {
 
   # WebSockets and socket stream code are not used on iOS and are optional in
   # cronet.
-  enable_websockets = !is_ios
-  disable_ftp_support = is_ios || is_chromecast
+  enable_websockets = !is_ios && !is_android
+  disable_ftp_support = is_ios || is_chromecast || is_android
 
   # Enable Kerberos authentication. It is disabled by default on ChromeOS, iOS,
   # Chromecast, at least for now. This feature needs configuration (krb5.conf
