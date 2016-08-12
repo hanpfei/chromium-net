@@ -1,0 +1,47 @@
+# Copyright (c) 2015 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+api_version: 1
+runtime: python27
+threadsafe: true
+
+builtins:
+- remote_api: on
+
+handlers:
+- url: /upload
+  script: perf_insights.endpoints.upload.app
+  secure: always
+
+- url: /corpus_cleanup
+  script: perf_insights.endpoints.corpus_cleanup.app
+  secure: always
+  login: admin
+
+- url: /query
+  script: perf_insights.endpoints.query.app
+  secure: always
+
+# Cloud Mapper Endpoints
+- url: /cloud_mapper/create
+  script: perf_insights.endpoints.cloud_mapper.create.app
+  secure: always
+
+- url: /cloud_mapper/status
+  script: perf_insights.endpoints.cloud_mapper.status.app
+  secure: always
+
+- url: /cloud_mapper/cancel
+  script: perf_insights.endpoints.cloud_mapper.cancel.app
+  secure: always
+
+- url: /cloud_mapper/task
+  script: perf_insights.endpoints.cloud_mapper.task.app
+  secure: always
+  login: admin
+
+- url: /cloud_mapper/test
+  script: perf_insights.endpoints.cloud_mapper.test.app
+  secure: always
+  login: admin

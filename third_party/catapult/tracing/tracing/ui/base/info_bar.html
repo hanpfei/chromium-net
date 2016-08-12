@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<!--
+Copyright (c) 2014 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<link rel="import" href="/tracing/ui/base/dom_helpers.html">
+<link rel="import" href="/tracing/ui/base/ui.html">
+
+<dom-module id='tr-ui-b-info-bar'>
+  <template>
+    <style>
+    :host {
+      align-items: center;
+      flex: 0 0 auto;
+      background-color: rgb(252, 235, 162);
+      border-bottom: 1px solid #A3A3A3;
+      border-left: 1px solid white;
+      border-right: 1px solid #A3A3A3;
+      border-top: 1px solid white;
+      display: flex;
+      height: 26px;
+      padding: 0 3px 0 3px;
+    }
+
+    :host(.info-bar-hidden) {
+      display: none;
+    }
+
+    #message { flex: 1 1 auto; }
+    </style>
+
+    <span id='message'></span>
+    <span id='buttons'></span>
+  </template>
+</dom-module>
+<script>
+'use strict';
+
+Polymer({
+  is: 'tr-ui-b-info-bar',
+
+  ready: function() {
+    this.messageEl_ = this.$.message;
+    this.buttonsEl_ = this.$.buttons;
+
+    this.message = '';
+    this.visible = false;
+  },
+
+  get message() {
+    return Polymer.dom(this.messageEl_).textContent;
+  },
+
+  set message(message) {
+    Polymer.dom(this.messageEl_).textContent = message;
+  },
+
+  get visible() {
+    return !Polymer.dom(this).classList.contains('info-bar-hidden');
+  },
+
+  set visible(visible) {
+    if (visible)
+      Polymer.dom(this).classList.remove('info-bar-hidden');
+    else
+      Polymer.dom(this).classList.add('info-bar-hidden');
+  },
+
+  removeAllButtons: function() {
+    Polymer.dom(this.buttonsEl_).textContent = '';
+  },
+
+  addButton: function(text, clickCallback) {
+    var button = document.createElement('button');
+    Polymer.dom(button).textContent = text;
+    button.addEventListener('click', clickCallback);
+    Polymer.dom(this.buttonsEl_).appendChild(button);
+    return button;
+  }
+});
+</script>

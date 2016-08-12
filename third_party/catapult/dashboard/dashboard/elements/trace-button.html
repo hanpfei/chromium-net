@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<!--
+Copyright 2016 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+<!--
+Most of this code is duplicated in bisect-form.
+TODO(qyearsley): This should be resolved for better code health.
+See https://github.com/catapult-project/catapult/issues/1905
+-->
+
+<link rel="import" href="/components/paper-button/paper-button.html">
+
+<link rel="import" href="/dashboard/elements/trace-form.html">
+<link rel="import" href="/dashboard/static/simple_xhr.html">
+
+<dom-module id="trace-button">
+  <template>
+    <style>
+      /*
+       * FIXME: This style is duplicated from the bisect-form style.
+       * See the comments there.
+       */
+      #button[enabled] {
+        background-color: #4285f4;
+        color: white;
+      }
+
+      :host(.mini) #button {
+        height: 22px;
+        line-height: 0.5em;
+        margin-left: 5px;
+        padding-top: 0;
+      }
+    </style>
+    <paper-button raised
+        id="button"
+        disabled$={{!canTrace}}
+        enabled$={{canTrace}}
+        on-click="onTrace">Trace</paper-button>
+    <trace-form
+        id="trace"
+        xsrf-token="{{xsrfToken}}"
+        earlier-revision="{{traceInfo.goodRev}}"
+        later-revision="{{traceInfo.badRev}}"
+        test-path="{{traceInfo.testPath}}"
+        rerun-info="{{traceInfo.traceRerunInfo}}"
+        bug-id="{{bugId}}"></trace-form>
+  </template>
+  <script>
+    'use strict';
+    (function() {
+      Polymer({
+
+        is: 'trace-button',
+        properties: {
+          bugId: { notify: true },
+          traceInfo: {
+            notify: true,
+            observer: 'traceInfoChanged'
+          },
+          xsrfToken: { notify: true }
+        },
+
+        /**
+         * Initializes this element; this is an element lifecycle callback.
+         */
+        ready: function() {
+          this.update();
+        },
+
+        /**
+         * Updates the trace button when the traceInfo is set.
+         */
+        traceInfoChanged: function() {
+          this.update();
+        },
+
+        /**
+         * Updates the canTrace state based on the traceInfo state.
+         */
+        update: function() {
+          this.canTrace = false;
+          if (!this.traceInfo) {
+            return;
+          }
+          var that = this;
+          simple_xhr.send(
+              '/can_bisect',
+              {
+                'test_path': this.traceInfo.testPath,
+                'start_revision': this.traceInfo.goodRev,
+                'end_revision': this.traceInfo.badRev,
+              },
+              function loadCallback(responseBool) {
+                that.canTrace = responseBool;
+              },
+              function errorCallback(message) {
+                console.warn('Request to /can_bisect failed.', message);
+                that.canTrace = true;
+              });
+        },
+
+        /**
+         * Displays the trace-form when the trace button is clicked.
+         */
+        onTrace: function() {
+          this.$.trace.show();
+        }
+      });
+    })();
+  </script>
+</dom-module>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<!--
+Copyright 2015 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<link rel="import" href="/perf_insights/mre/function_handle.html">
+<link rel="import" href="/tracing/base/range.html">
+<link rel="import" href="/tracing/value/numeric.html">
+<link rel="import" href="/tracing/value/unit.html">
+
+<script>
+'use strict';
+
+tr.exportTo('pi.m', function() {
+  var COUNT_NUMERIC_BUILDER = tr.v.NumericBuilder.createLinear(
+      tr.v.Unit.byName.unitlessNumber, tr.b.Range.fromExplicitRange(0, 50000),
+      20);
+
+  function traceStatsFunction(result, model) {
+    var canonicalUrl = model.canonicalUrl;
+    var eventCount = 0;
+    var firstTime = Number.MAX_VALUE;
+    var lastTime = 0;
+    var categories = {};
+
+    var seconds_counts = {};
+    for (var event of model.getDescendantEvents()) {
+      eventCount += 1;
+      if (event.start < firstTime)
+        firstTime = event.start;
+
+      var eventEnd = event.start + event.duration;
+      if (eventEnd > lastTime)
+        lastTime = eventEnd;
+
+      if (categories[event.category] === undefined)
+        categories[event.category] = 0;
+
+      categories[event.category]++;
+
+      var second = Math.round(event.start / 1000);
+      if (seconds_counts[second] === undefined)
+        seconds_counts[second] = 0;
+
+      seconds_counts[second]++;
+    }
+
+    var histogram = COUNT_NUMERIC_BUILDER.build();
+
+    for (var second in seconds_counts)
+      histogram.add(seconds_counts[second]);
+
+    var stats = {
+      totalEvents: eventCount,
+      firstTimeInMS: firstTime,
+      lastTimeInMS: lastTime,
+      durationInMS: lastTime - firstTime,
+      eventsPerSecond: eventCount / (lastTime - firstTime) * 1000,
+      categories: categories,
+      events_seconds: histogram.asDict()
+    };
+
+    result.addPair('stats', stats);
+  }
+
+  pi.FunctionRegistry.register(traceStatsFunction);
+
+  //Exporting for tests.
+  return {
+    traceStatsFunctionForTest: traceStatsFunction
+  };
+});
+</script>

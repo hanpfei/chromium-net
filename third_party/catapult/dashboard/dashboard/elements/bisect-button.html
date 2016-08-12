@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<!--
+Copyright 2016 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<link rel="import" href="/components/paper-button/paper-button.html">
+
+<link rel="import" href="/dashboard/elements/bisect-form.html">
+<link rel="import" href="/dashboard/static/simple_xhr.html">
+
+<dom-module id="bisect-button">
+  <template>
+    <style>
+      /*
+       * A special style for the "enabled" attribute is used because when style
+       * is applied to the button element, it seems to override the paper-button
+       * [disabled] style.
+       * The selector #button:enabled doesn't work because the underlying
+       * element inside paper-button is a div, not a form element.
+       */
+      #button[enabled] {
+        background-color: #4285f4;
+        color: white;
+      }
+
+      /*
+       * Style for when this custom element when it has the class "mini".
+       * See: http://www.polymer-project.org/articles/styling-elements.html
+       */
+      :host(.mini) #button {
+        height: 22px;
+        line-height: 0.5em;
+        margin-left: 5px;
+        padding-top: 0;
+      }
+    </style>
+    <paper-button raised
+        id="button"
+        disabled$={{!canBisect}}
+        enabled$={{canBisect}}
+        on-click="onBisect">Bisect</paper-button>
+    <bisect-form
+        id="bisect"
+        xsrf-token="{{xsrfToken}}"
+        earlier-revision="{{bisectInfo.goodRev}}"
+        later-revision="{{bisectInfo.badRev}}"
+        test-path="{{bisectInfo.testPath}}"
+        bug-id="{{bugId}}"></bisect-form>
+  </template>
+  <script>
+    'use strict';
+
+    (function() {
+      Polymer({
+
+        is: 'bisect-button',
+        properties: {
+          bisectInfo: {
+            notify: true,
+            observer: 'bisectInfoChanged'
+          },
+          bugId: { notify: true },
+          xsrfToken: { notify: true }
+        },
+
+        /**
+         * Initializes this element; this is an element lifecycle callback.
+         */
+        ready: function() {
+          this.update();
+        },
+
+        /**
+         * Updates the bisect button when the bisectInfo is set.
+         */
+        bisectInfoChanged: function() {
+          this.update();
+        },
+
+        /**
+         * Updates the canBisect state based on the bisectInfo state.
+         */
+        update: function() {
+          this.canBisect = false;
+          if (!this.bisectInfo) {
+            return;
+          }
+          var that = this;
+          simple_xhr.send(
+              '/can_bisect',
+              {
+                'test_path': this.bisectInfo.testPath,
+                'start_revision': this.bisectInfo.goodRev,
+                'end_revision': this.bisectInfo.badRev,
+              },
+              function loadCallback(responseBool) {
+                that.canBisect = responseBool;
+              },
+              function errorCallback(message) {
+                console.warn('Request to /can_bisect failed.', message);
+                that.canBisect = true;
+              });
+        },
+
+        /**
+         * Displays the bisect-form when the bisect button is clicked.
+         */
+        onBisect: function() {
+          this.$.bisect.show();
+        }
+      });
+    })();
+  </script>
+</dom-module>

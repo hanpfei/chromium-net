@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<!--
+Copyright (c) 2014 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<link rel="import" href="/tracing/core/test_utils.html">
+<link rel="import" href="/tracing/model/event_set.html">
+<link rel="import" href="/tracing/model/model.html">
+<link rel="import" href="/tracing/model/power_series.html">
+<link rel="import" href="/tracing/ui/analysis/alert_sub_view.html">
+<link rel="import" href="/tracing/ui/analysis/multi_power_sample_sub_view.html">
+<link rel="import" href="/tracing/ui/base/tab_view.html">
+
+<dom-module id='tr-ui-b-tab-view-test-non-sub-view'>
+  <template>
+    <div></div>
+  </template>
+</dom-module>
+<script>
+'use strict';
+
+var tr_ui_b_tab_view_test_non_sub_view_behavior = {};
+
+Polymer({
+  is: 'tr-ui-b-tab-view-test-non-sub-view',
+  behaviors: [tr_ui_b_tab_view_test_non_sub_view_behavior]
+});
+
+tr.b.unittest.testSuite(function() {
+  function createPowerSampleSubView() {
+    var model = tr.c.TestUtils.newModel(function(m) {
+      m.device.powerSeries = new tr.model.PowerSeries(m.device);
+
+      m.device.vSyncTimestamps = [0];
+      m.device.powerSeries.addPowerSample(1, 1);
+      m.device.powerSeries.addPowerSample(2, 2);
+      m.device.powerSeries.addPowerSample(3, 3);
+      m.device.powerSeries.addPowerSample(4, 2);
+    });
+
+    var subView = document.createElement('tr-ui-a-multi-power-sample-sub-view');
+    subView.selection = new tr.model.EventSet(model.device.powerSeries.samples);
+    subView.tabLabel = 'Power samples';
+    return subView;
+  }
+
+  function createAlertSubView() {
+    var slice = tr.c.TestUtils.newSliceEx(
+        {title: 'b', start: 0, duration: 0.002});
+    var alertInfo = new tr.model.EventInfo(
+        'Alert 1', 'Critical alert',
+        [{
+          label: 'Example',
+          textContent: 'Example page',
+          href: 'http://www.example.com'
+        }]);
+
+    var alert = new tr.model.Alert(alertInfo, 5, [slice]);
+    var subView = document.createElement('tr-ui-a-alert-sub-view');
+    subView.selection = new tr.model.EventSet(alert);
+    subView.tabLabel = 'Alerts';
+
+    return subView;
+  }
+
+  test('instantiate_noTabs', function() {
+    var tabView = document.createElement('tr-ui-a-tab-view');
+    tabView.label = 'No items selected.';
+    this.addHTMLOutput(tabView);
+  });
+
+  test('instantiate_oneTab', function() {
+    var tabView = document.createElement('tr-ui-a-tab-view');
+    tabView.label = '1 item selected.';
+    tabView.addSubView(createPowerSampleSubView());
+    this.addHTMLOutput(tabView);
+  });
+
+  test('instantiate_twoTabs', function() {
+    var tabView = document.createElement('tr-ui-a-tab-view');
+    tabView.label = '3 items selected.';
+    tabView.addSubView(createPowerSampleSubView());
+    tabView.addSubView(createAlertSubView());
+    this.addHTMLOutput(tabView);
+  });
+
+  test('clearSubViews_selectedSubViewNullAfter', function() {
+    var tabView = document.createElement('tr-ui-a-tab-view');
+    tabView.label = '3 items selected.';
+    tabView.addSubView(createPowerSampleSubView());
+    tabView.addSubView(createAlertSubView());
+
+    tabView.clearSubViews();
+
+    assert.isUndefined(tabView.selectedSubView);
+  });
+});
+</script>

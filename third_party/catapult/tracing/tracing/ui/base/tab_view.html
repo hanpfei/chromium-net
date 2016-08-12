@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<!--
+Copyright (c) 2014 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<link rel="import" href="/tracing/ui/analysis/analysis_sub_view.html">
+
+<!--
+@fileoverview A series of tabs for the analysis view that controls which
+analysis sub-view is being displayed.
+
+We follow a fairly standard web convention of backing our tabs with hidden radio
+buttons but visible radio button labels (the tabs themselves) which toggle the
+input element when clicked. Using hidden radio buttons makes sense, as both tabs
+and radio buttons are input elements that allow user selection through clicking
+and limit users to having one option selected at a time.
+-->
+<dom-module id='tr-ui-a-tab-view'>
+  <template>
+    <style>
+      #selection_description, #tabs {
+        font-size: 12px;
+      }
+
+      #selection_description {
+        display: inline-block;
+        font-weight: bold;
+        margin: 9px 0px 4px 20px;
+      }
+
+      #tabs {
+        display: block;
+        border-top: 1px solid #8e8e8e;
+        border-bottom: 1px solid #8e8e8e;
+        background-color: #ececec;
+        overflow: hidden;
+        margin: 0;
+      }
+
+      #tabs input[type=radio] {
+        display: none;
+      }
+
+      #tabs tab label {
+        cursor: pointer;
+        display: inline-block;
+        border: 1px solid #ececec;
+        margin: 5px 0px 0px 15px;
+        padding: 3px 10px 3px 10px;
+      }
+
+      #tabs input[type=radio]:checked ~ label {
+        background-color: white;
+        border: 1px solid #8e8e8e;
+        border-bottom: 1px solid white;
+      }
+    </style>
+    <div id='tabs' hidden="[[tabsHidden]]">
+      <label id=selection_description>[[label_]]</label>
+      <template is=dom-repeat items=[[subViews_]]>
+        <tab>
+          <input type=radio name=tabs id$=[[computeRadioId_(item)]]
+              on-change='onTabChanged_'
+              checked$='[[isChecked_(item)]]' />
+          <label for$=[[computeRadioId_(item)]]>[[item.tabLabel]]</label>
+        </tab>
+      </template>
+    </div>
+    <div id='subView'></div>
+    <content>
+    </content>
+  </template>
+</dom-module>
+<script>
+'use strict';
+
+Polymer({
+  is: 'tr-ui-a-tab-view',
+
+  properties: {
+    label_: {
+      type: String,
+      value: () => ''
+    },
+    selectedSubView_: Object,
+    subViews_: {
+      type: Array,
+      value: () => []
+    },
+    tabsHidden: {
+      type: Boolean,
+      value: false
+    }
+  },
+
+  set label(newLabel) {
+    this.set('label_', newLabel);
+  },
+
+  get tabs() {
+    return this.get('subViews_');
+  },
+
+  get selectedSubView() {
+    return this.selectedSubView_;
+  },
+
+  set selectedSubView(subView) {
+    if (subView === this.selectedSubView_)
+      return;
+
+    if (this.selectedSubView_)
+      Polymer.dom(this.$.subView).removeChild(this.selectedSubView_);
+
+    this.set('selectedSubView_', subView);
+
+    if (subView)
+      Polymer.dom(this.$.subView).appendChild(subView);
+
+    this.fire('selected-tab-change');
+  },
+
+  clearSubViews: function() {
+    this.splice('subViews_', 0, this.subViews_.length);
+    this.selectedSubView = undefined;
+  },
+
+  addSubView: function(subView) {
+    if (!this.selectedSubView_)
+      this.selectedSubView = subView;
+
+    this.push('subViews_', subView);
+  },
+
+  resetSubViews: function(subViews) {
+    this.splice('subViews_', 0, this.subViews_.length);
+    if (subViews.length) {
+      for (var subView of subViews)
+        this.push('subViews_', subView);
+      this.selectedSubView = subViews[0];
+    }
+    else {
+      this.selectedSubView = undefined;
+    }
+  },
+
+  onTabChanged_: function(event) {
+    this.selectedSubView = event.model.item;
+  },
+
+  isChecked_: function(subView) {
+    return this.selectedSubView_ === subView;
+  },
+
+  computeRadioId_: function(subView) {
+    // We can't just use the tagName as the radio's ID because there are
+    // instances where a single subview type can handle multiple event types,
+    // and thus might be present multiple times in a single tab view. In order
+    // to avoid the case where we might have two tabs with the same ID, we
+    // uniquify this ID by appending the tab's label with all spaces replaced
+    // by dashes (because spaces aren't allowed in HTML IDs).
+    return subView.tagName + '-' + subView.tabLabel.replace(/ /g, '-');
+  }
+});
+</script>

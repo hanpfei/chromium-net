@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<!--
+Copyright 2016 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+<link rel="import" href="/dashboard/elements/chart-container.html">
+<link rel="import" href="/dashboard/elements/login-warning.html">
+<link rel="import" href="/dashboard/elements/test-picker.html">
+<link rel="import" href="/dashboard/static/simple_xhr.html">
+<link rel="import" href="/dashboard/static/uri.html">
+
+<dom-module id="report-page">
+  <template>
+    <style>
+      #nav-container {
+        display: flex;
+        margin: 5px;
+      }
+    </style>
+
+    <login-warning id="login-warning" login-link="{{loginUrl}}"
+                   hidden$="{{isInternalUser}}">
+    </login-warning>
+
+    <div id="nav-container">
+      <test-picker id="test-picker" xsrf-token="{{xsrfToken}}"
+                   test-suites="{{testSuites}}"></test-picker>
+    </div>
+    <section id="charts-container"></section>
+
+    <div id="toasts" hidden>
+      <div id="warningtoast">
+        {{warningMessage}}
+        <template is="dom-if" if="{{!!warningBug}}">
+          <a href="https://github.com/catapult-project/catapult/issues/{{warningBug}}">See
+            bug #{{warningBug}}.</a>
+        </template>
+      </div>
+    </div>
+
+  </template>
+
+  <script>
+    'use strict';
+    Polymer({
+
+      is: 'report-page',
+      properties: {
+        charts: {
+          type: Array,
+          value: () => [],
+          notify: true
+        },
+        hasChart: { notify: true },
+        onRevisionRange: { observer: 'onRevisionRangeChanged' },
+        graphParams: {
+          type: Object,
+          value: () => ({})
+        },
+        isInternalUser: {
+          type: Boolean,
+          value: false
+        },
+        loginUrl: {
+          type: String,
+          value: ''
+        },
+        revisionInfo: {
+          type: Object,
+          value: () => ({})
+        },
+        warningBug: {
+          type: Number,
+          value: 0
+        },
+        warningMessage: {
+          type: String,
+          value: ''
+        },
+        xsrfToken: {
+          type: String,
+          value: ''
+        },
+        testSuites: {
+          type: Object,
+          value: () => ({})
+        }
+      },
+
+      ready: function() {
+        simple_xhr.send('/report', uri.getAllParameters(),
+          function(response) {
+            this.isInternalUser = response['is_internal_user'];
+            this.loginUrl = response['login_url'];
+            this.revisionInfo = response['revision_info'];
+            this.warningBug = response['warning_bug'];
+            this.warningMessage = response['warning_message'];
+            if (this.warningMessage) {
+              this.fire('display-toast', {
+                  'content': this.$.warningtoast,
+                  'error': true
+              });
+            }
+            this.xsrfToken = response['xsrf_token'];
+            this.testSuites = response['test_suites'];
+            for (var i = 0; i < this.charts.length; i++) {
+              this.setChartData(this.charts[i]);
+            }
+          }.bind(this),
+          function(error) {
+
+          }.bind(this));
+
+        window.addEventListener('pagestaterequest',
+                                this.onPageStateRequest.bind(this));
+
+        this.testPicker = this.$['test-picker'];
+        this.testPicker.addEventListener(
+            'add', this.onAddChartButtonClicked.bind(this));
+
+        window.addEventListener('uriload', this.onUriLoad.bind(this));
+        this.uriController = new uri.Controller(this.getPageState.bind(this));
+        this.uriController.load();
+      },
+
+      /**
+       * On 'uriload' event, adds charts from the current query parameters.
+       * @param {Object} event Event object.
+       */
+      onUriLoad: function(event) {
+        var params = event.detail.params;
+        var pageState = event.detail.state;
+        if (!pageState) {
+          return;
+        }
+        // Set page level parameters.
+        this.graphParams = {};
+        for (var key in params) {
+          this.graphParams[key] = params[key];
+        }
+
+        // Add charts.
+        var chartStates = pageState['charts'];
+        for (var i = 0; i < chartStates.length; i++) {
+          this.addChart(chartStates[i], false);
+        }
+      },
+
+      /**
+       * Updates chart data with member variables.
+       * TODO(sullivan): this should be done with polymer templates, not
+       * JS code.
+       */
+      setChartData: function(chart) {
+        chart.isInternalUser = this.isInternalUser;
+        chart.testSuites = this.testSuites;
+        chart.revisionInfo = this.revisionInfo;
+        chart.xsrfToken = this.xsrfToken;
+        chart.graphParams = this.graphParams;
+      },
+
+      /**
+       * Adds a chart.
+       * @param {Array.<Array>} testPathAndSelected A list of two-element
+       *     Arrays, each containing a test path and selected series to plot.
+       * @param {boolean} isPrepend True for prepend, false for append.
+       */
+      addChart: function(testPathAndSelected, isPrepend) {
+        // TODO(sullivan): This should be done with a polymer template, not
+        // JavaScript-built DOM!!
+        var container = this.$['charts-container'];
+        var chart = document.createElement('chart-container');
+        if (isPrepend && Polymer.dom(container).children.length > 0) {
+          this.charts.unshift(chart);
+          Polymer.dom(container).insertBefore(chart,
+              Polymer.dom(container).children[0]);
+        } else {
+          this.charts.push(chart);
+          Polymer.dom(container).appendChild(chart);
+        }
+
+        chart.addEventListener(
+            'chartclosed', this.onChartClosed.bind(this), true);
+        chart.addEventListener(
+            'chartstatechanged',
+            this.uriController.onPageStateChanged.bind(this.uriController));
+        chart.addEventListener(
+            'revisionrange', this.onRevisionRangeChanged.bind(this));
+        this.setChartData(chart);
+        chart.addSeriesGroup(testPathAndSelected, true);
+        this.testPicker.hasChart = true;
+      },
+
+      /**
+       * On chart closed, update URI.
+       */
+      onChartClosed: function(event) {
+        var chart = event.target;
+        var index = this.charts.indexOf(chart);
+        if (index > -1) {
+          this.charts.splice(index, 1);
+        }
+
+        this.fireNumChartChangedEvent();
+      },
+
+      /**
+       * Triggers page state change handler with 'numchartchanged' event.
+       */
+      fireNumChartChangedEvent: function() {
+        // Send page state change event.
+        var event = document.createEvent('Event');
+        event.initEvent('numchartchanged', true, true);
+        event.detail = {
+          'stateName': 'numchartchanged',
+          'params': this.graphParams,
+          'state': {}
+        };
+
+        if (this.charts.length == 0) {
+          event.detail['params'] = null;
+          this.graphParams = {};
+          this.testPicker.hasChart = false;
+        }
+
+        this.uriController.onPageStateChanged(event);
+      },
+
+      /**
+       * When the revision range changes for one graph, update the rest of
+       * the graphs and the URI.
+       */
+      onRevisionRangeChanged: function(_, event) {
+        for (var i = 0; i < this.charts.length; i++) {
+          var chart = this.charts[i];
+          if (chart == event.target) {
+            continue;
+          }
+          chart.onRevisionRange(event, event['detail'], null);
+        }
+      },
+
+      /**
+       * On 'Add' button clicked, add a chart for the current selection.
+       */
+      onAddChartButtonClicked: function(event) {
+        var selection = this.testPicker.getCurrentSelection();
+        if (selection && selection.isValid()) {
+          this.addChart(selection.getTestPathAndSelectedSeries(), true);
+        }
+        this.fireNumChartChangedEvent();
+      },
+
+      /**
+       * Gets report page state.
+       *
+       * @return {Object} Dictionary of page state data.
+       */
+      getPageState: function() {
+        var chartStates = [];
+        for (var i = 0; i < this.charts.length; i++) {
+          var chart = this.charts[i];
+          chartStates.push(chart.getState());
+        }
+
+        if (chartStates.length === 0) {
+          return null;
+        }
+
+        return {
+          'charts': chartStates
+        };
+      },
+
+      /**
+       * Handles displaying loading messages on 'pagestaterequest' event.
+       */
+      onPageStateRequest: function(event) {
+        var status = event.detail.status;
+        if (status == 'loading') {
+          this.fire('display-toast', {'text': 'Saving report...'});
+        } else if (status == 'error') {
+          this.fire('display-toast', {
+              'text': 'Failed to save report.',
+              'error': true
+          });
+        }
+      }
+    });
+  </script>
+</dom-module>

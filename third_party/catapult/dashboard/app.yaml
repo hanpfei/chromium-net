@@ -1,0 +1,209 @@
+# Python Application Configuration
+# https://developers.google.com/appengine/docs/python/config/appconfig
+
+runtime: python27
+api_version: 1
+threadsafe: false
+
+libraries:
+- name: jinja2
+  version: "2.6"
+- name: pycrypto
+  version: "2.6"
+- name: webapp2
+  version: "2.5.1"
+
+builtins:
+- remote_api: on
+- appstats: on
+- deferred: on
+
+inbound_services:
+- warmup
+
+handlers:
+
+- url: /mapreduce(/.*)?
+  script: mapreduce.main.APP
+  login: admin
+
+- url: /_ah/pipeline(/.*)?
+  script: pipeline.handlers._APP
+
+- url: /_ah/queue/deferred
+  script: google.appengine.ext.deferred.application
+  login: admin
+
+- url: /_ah/dev_console(/.*)?
+  script: google.appengine.ext.admin.application
+  login: admin
+  secure: always
+
+- url: /favicon.ico
+  static_files: dashboard/static/favicon.ico
+  upload: dashboard/static/favicon.ico
+  secure: always
+
+- url: /dashboard/static/
+  static_dir: dashboard/static/
+  secure: always
+  application_readable: true
+
+- url: /dashboard/elements/(.*\.html)$
+  static_files: dashboard/elements/\1
+  upload: dashboard/elements/.*\.html$
+  secure: always
+
+- url: /components/(.*)/(.*\.(html|js|css))$
+  static_files: polymer/components/\1/\2
+  upload: polymer/components/.*/.*\.(html|js|css)$
+  secure: always
+
+- url: /flot/(.*\.js)$
+  static_files: flot/\1
+  upload: flot/.*\.js$
+  secure: always
+
+- url: /jquery/(.*\.js)$
+  static_files: jquery/\1
+  upload: jquery/.*\.js$
+  secure: always
+
+- url: /add_point_queue
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /associate_alerts
+  script: dashboard.dispatcher.APP
+  login: required
+  secure: always
+
+- url: /auto_bisect
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /auto_triage
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /bot_whitelist
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /change_internal_only
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /delete_expired_entities
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /delete_old_tests
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /delete_test_data
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /edit_anomaly_configs
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /edit_bug_labels
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /edit_sheriffs
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /edit_anomalies
+  script: dashboard.dispatcher.APP
+  login: required
+  secure: always
+
+- url: /edit_site_config
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /email_summary
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /file_bug
+  script: dashboard.dispatcher.APP
+  login: required
+  secure: always
+
+- url: /load_from_prod
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /migrate_test_names
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /mr_deprecate_tests
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /new_points
+  script: dashboard.dispatcher.APP
+  login: required
+  secure: always
+
+- url: /put_entities_task
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /send_stoppage_alert_emails
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /start_try_job
+  script: dashboard.dispatcher.APP
+  login: required
+  secure: always
+
+- url: /stats_around_revision
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /update_bug_with_results
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /update_test_metadata
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /update_test_suites
+  script: dashboard.dispatcher.APP
+  login: admin
+  secure: always
+
+- url: /.*
+  script: dashboard.dispatcher.APP
+  secure: always

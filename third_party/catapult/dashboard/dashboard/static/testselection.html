@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<!--
+Copyright 2015 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<script>
+'use strict';
+
+/**
+ * This file contains TestSelection, a class for managing a set
+ * of test data series to plot on one chart.
+ */
+var testselection = (function() {
+
+  /**
+   * @param {string} test Test path, not including master/bot.
+   * @return {boolean} True if the test is "important". Note that this is
+   *     different from "important" flag for data that's sent to /add_point.
+   */
+  var isImportant = function(test, testSuites) {
+    return isChartLevel_(test) || isMonitored_(test, testSuites);
+  };
+
+  /**
+   * @param {string} testPath Test path.
+   * @return {string} Test without master/bot.
+   */
+  var testFromTestPath_ = function(testPath) {
+    return testPath.split('/').slice(2).join('/');
+  };
+
+  /**
+   * @param {string} test Test path, not including master/bot.
+   * @return {boolean} True if the test name only has two parts.
+   */
+  var isChartLevel_ = function(test) {
+    return test.split('/').length <= 2;
+  };
+
+  /**
+   * @param {string} test Test path, not including master/bot.
+   * @return {boolean} True if the test name only has two parts.
+   */
+  var isMonitored_ = function(test, testSuites) {
+    var parts = test.split('/');
+    var testSuiteName = parts[0];
+    var subTestPath = parts.slice(1).join('/');
+    if (testSuites && testSuites[testSuiteName]) {
+      var important = testSuites[testSuiteName]['mon'];
+      if (important && important.indexOf(subTestPath) != -1) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  /**
+   * A TestSelection object represents both a set of tests, as well as
+   * information about which tests are "important", "ref", and "core",
+   * as well as (optionally) the revision range to plot.
+   * @constructor
+   */
+  var TestSelection = function(testSuites) {
+
+    this.testSuites = testSuites;
+
+    /**
+     * A mapping of test paths to lists of selected series.
+     * @type {Object.<string,Array>}
+     * @private
+     */
+    this.testPathDict_ = {};
+  };
+
+  /**
+   * Adds a test path to the selection.
+   * If the exact same test has already been added, do nothing.
+   * @param {string} testPath Test path.
+   * @param {Array.<string>} selectedTraces selected trace name.
+   */
+  TestSelection.prototype.addTestPath = function(
+      testPath, selectedTraces) {
+    if (!(testPath in this.testPathDict_)) {
+      this.testPathDict_[testPath] = [];
+    }
+    if (selectedTraces) {
+      for (var i = 0; i < selectedTraces.length; i++) {
+        if (this.testPathDict_[testPath].indexOf(selectedTraces[i]) == -1) {
+          this.testPathDict_[testPath].push(selectedTraces[i]);
+        }
+      }
+    }
+  };
+
+  /**
+   * Checks whether the selection could be graphed.
+   * A selection must have at least one test and one bot to be graphed.
+   */
+  TestSelection.prototype.isValid = function() {
+    return Boolean(this.getTests().length);
+  };
+
+  /**
+   * @return {Array.<string>} Test paths of all tests that have been added to
+   *     this selection; first the core tests, then the non-core tests.
+   *     tests, then others and their corresponding ref tests.
+   */
+  TestSelection.prototype.getTests = function() {
+    var core = this.getCoreTests_();
+    var nonCore = this.complementaryTests_(core);
+    var coreSorted = Object.keys(core).sort();
+    var othersSorted = Object.keys(nonCore).sort();
+    return coreSorted.concat(othersSorted);
+  };
+
+  /**
+   * Returns a list of two-item Arrays, each of which contains a test path and
+   *     Array of selected series under that test path.
+   */
+  TestSelection.prototype.getTestPathAndSelectedSeries = function() {
+    var testPathAndSelected = [];
+    for (var testPath in this.testPathDict_) {
+      testPathAndSelected.push([testPath, this.testPathDict_[testPath]]);
+    }
+    return testPathAndSelected;
+  };
+
+  /**
+   * @param {Object.<string,boolean>} testSet A set of test paths.
+   * @return {Object.<string,boolean>} An Object mapping all tests that aren't
+   *     in the given set of tests to true.
+   */
+  TestSelection.prototype.complementaryTests_ = function(testSet) {
+    var complement = {};
+    for (var testPath in this.testPathDict_) {
+      var test = testFromTestPath_(testPath);
+      if (!testSet[test]) {
+        complement[test] = true;
+      }
+    }
+    return complement;
+  };
+
+  /**
+   * Gets a dict of core test paths.
+   * @return {Object.<string,boolean>} Dict of core test to important boolean.
+   */
+  TestSelection.prototype.getCoreTests_ = function() {
+    var core = {};
+    for (var testPath in this.testPathDict_) {
+      var test = testFromTestPath_(testPath);
+      if (isImportant(test, this.testSuites)) {
+        core[test] = true;
+        var ref = this.getCorrespondingRef_(testPath);
+        if (ref) {
+          core[ref] = true;
+        }
+      }
+    }
+    return core;
+  };
+
+  /**
+   * Gets the name of the ref test in the selection if there is one.
+   * @param {string} testPath A test path string.
+   * @return {string} The ref trace, or the empty string if there is none.
+   */
+  TestSelection.prototype.getCorrespondingRef_ = function(
+      testPath) {
+    var testParts = testPath.split('/');
+    var lastPart = testParts[testParts.length - 1];
+    var traces = this.testPathDict_[testPath];
+    var test = testFromTestPath_(testPath);
+    if (lastPart + '_ref' in traces) {
+      return test + '_ref';
+    }
+    if ('ref' in traces) {
+      return test + '/ref';
+    }
+    return '';
+  };
+
+  return {
+    isImportant: isImportant,
+    TestSelection: TestSelection
+  };
+})();
+
+</script>

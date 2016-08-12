@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<!--
+Copyright 2015 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<script src="/jquery/jquery-2.1.4.min.js"></script>
+<script src="/flot/jquery.flot.min.js"></script>
+<script src="/flot/jquery.flot.crosshair.min.js"></script>
+<script src="/flot/jquery.flot.fillbetween.min.js"></script>
+<script src="/flot/jquery.flot.selection.min.js"></script>
+
+<link rel="import" href="/dashboard/elements/chart-container.html">
+<link rel="import" href="/dashboard/static/graph.html">
+<link rel="import" href="/dashboard/static/testdata/dromaeo-charts.html">
+<link rel="import" href="/dashboard/static/testing_common.html">
+<link rel="import" href="/dashboard/static/uri.html">
+
+<link rel="import" href="/tracing/core/test_utils.html">
+
+<script>
+'use strict';
+
+tr.b.unittest.testSuite(function() {
+
+  var testOptions = {
+    tearDown: function() {
+      testing_common.clearXhrMock();
+      testing_common.clearFixture();
+    }
+  };
+
+  test('instantiate basic', function() {
+    testing_common.mockChartJson(dromaeo_charts);
+    var chart = document.createElement('chart-container');
+    this.addHTMLOutput(chart);
+    chart.addSeriesGroup(dromaeo_charts.graphParams);
+  }, testOptions);
+
+  test('data is loaded when a series group is added', function() {
+    testing_common.mockChartJson(dromaeo_charts);
+    var chart = document.createElement('chart-container');
+    chart.addSeriesGroup(dromaeo_charts.graphParams);
+    this.addHTMLOutput(chart);
+    assert.equal(chart.getDataForFlot().length, 3);
+  }, testOptions);
+
+  test('warning added for stale series', function() {
+    var graphJson = testing_common.deepCopy(dromaeo_charts.graphSelectedJson);
+    for (var annotation in graphJson['annotations']['0']) {
+      graphJson['annotations']['0'][annotation]['timestamp'] -= 8 * 86400000;
+    }
+    testing_common.mockChartJson(dromaeo_charts, graphJson);
+    var chart = document.createElement('chart-container');
+    this.addHTMLOutput(chart);
+    chart.addSeriesGroup(dromaeo_charts.graphParams);
+
+    return new Promise(function(resolve) {
+      function check() {
+        assert.lengthOf(chart.warnings, 1);
+        assert.notEqual(-1, chart.warnings[0].indexOf('Graph out of date!'));
+        resolve();
+      }
+      requestAnimationFrame(check);
+    });
+  }, testOptions);
+
+});
+</script>
