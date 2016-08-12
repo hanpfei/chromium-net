@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/config/crypto.gni")
-import("//testing/test.gni")
 
 component("crypto") {
   output_name = "crcrypto"  # Avoid colliding with OpenSSL's libcrypto.
