@@ -129,51 +129,6 @@ component("crypto") {
   }
 }
 
-test("crypto_unittests") {
-  sources = [
-    "aead_unittest.cc",
-    "curve25519_unittest.cc",
-    "ec_private_key_unittest.cc",
-    "ec_signature_creator_unittest.cc",
-    "encryptor_unittest.cc",
-    "hkdf_unittest.cc",
-    "hmac_unittest.cc",
-    "nss_key_util_unittest.cc",
-    "nss_util_unittest.cc",
-    "openssl_bio_string_unittest.cc",
-    "p224_spake_unittest.cc",
-    "p224_unittest.cc",
-    "random_unittest.cc",
-    "rsa_private_key_unittest.cc",
-    "secure_hash_unittest.cc",
-    "sha2_unittest.cc",
-    "signature_creator_unittest.cc",
-    "signature_verifier_unittest.cc",
-    "symmetric_key_unittest.cc",
-  ]
-
-  # Some files are built when NSS is used for the platform certificate library.
-  if (!use_nss_certs) {
-    sources -= [
-      "nss_key_util_unittest.cc",
-      "nss_util_unittest.cc",
-    ]
-  }
-
-  configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
-
-  deps = [
-    ":crypto",
-    ":platform",
-    ":test_support",
-    "//base",
-    "//base/test:run_all_unittests",
-    "//base/test:test_support",
-    "//testing/gmock",
-    "//testing/gtest",
-  ]
-}
-
 # This has no sources in some cases so can't be a static library.
 source_set("test_support") {
   testonly = true
