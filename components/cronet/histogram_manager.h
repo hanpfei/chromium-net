@@ -16,7 +16,7 @@
 #include "base/metrics/histogram_flattener.h"
 #include "base/metrics/histogram_snapshot_manager.h"
 #include "base/synchronization/lock.h"
-#include "components/metrics/proto/chrome_user_metrics_extension.pb.h"
+//#include "components/metrics/proto/chrome_user_metrics_extension.pb.h"
 
 namespace cronet {
 
@@ -51,7 +51,7 @@ class HistogramManager : public base::HistogramFlattener {
   base::HistogramSnapshotManager histogram_snapshot_manager_;
 
   // Stores the protocol buffer representation for this log.
-  metrics::ChromeUserMetricsExtension uma_proto_;
+//  metrics::ChromeUserMetricsExtension uma_proto_;
 
   // Should be acquired whenever GetDeltas() is executing to maintain
   // thread-safety.
