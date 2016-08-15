@@ -378,7 +378,10 @@ component("net") {
       if (is_android) {
         # Use ICU alternative on Android.
         sources += [ "base/net_string_util_icu_alternatives_android.cc" ]
-        deps += [ ":net_jni_headers" ]
+        deps += [
+          ":net_jni_headers",
+#          "//base:i18n",
+        ]
       } else if (is_ios) {
         # Use ICU alternative on iOS.
         sources += [ "base/net_string_util_icu_alternatives_ios.mm" ]

@@ -7,5 +7,5 @@
 declare_args() {
   # Enables the use of ICU alternatives in lieu of ICU. The flag is used
   # for Cronet to reduce the size of the Cronet binary.
-  use_platform_icu_alternatives = false
+  use_platform_icu_alternatives = true
 }
