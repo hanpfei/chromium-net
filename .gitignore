@@ -6,7 +6,7 @@
 .project
 .settings
 .tags
-*.so
+# *.so
 *.so.TOC
 *.dat
 
