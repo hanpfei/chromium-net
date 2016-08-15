@@ -116,6 +116,11 @@ group("both_gn_and_gyp") {
       "//third_party/android_async_task:android_async_task_java",
 #      "//tools/android:android_tools",
     ]
+    if (!is_component_build) {
+      deps += [
+        "//components/cronet/android:cronet_package",
+      ]
+    }
   }
 
   if (is_mac) {

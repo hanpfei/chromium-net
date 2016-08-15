@@ -3,7 +3,7 @@ target_cpu = "arm"  # (default)
 is_debug = false  # (default)
 
 # Other args you may want to set:
-is_component_build = true
+is_component_build = false
 is_clang = false
 symbol_level = 1  # Faster build with fewer symbols. -g1 rather than -g2
 enable_incremental_javac = false  # Much faster; experimental
