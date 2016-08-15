@@ -256,6 +256,9 @@ shared_library("cronet") {
     "//base",
     "//net:net",
   ]
+
+  libs = [ "c++_shared", ]
+
   ldflags = [ "-Wl,--version-script=" +
               rebase_path("//components/cronet/android/only_jni_exports.lst") ]
 
