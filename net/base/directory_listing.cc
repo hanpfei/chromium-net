@@ -81,7 +81,7 @@ std::string GetDirectoryListingEntry(const base::string16& name,
                            << ",";
     result.append(raw_time_string_stream.str());
 
-    modified_str = base::TimeFormatShortDateAndTime(modified);
+//    modified_str = base::TimeFormatShortDateAndTime(modified);
   }
 
   base::EscapeJSONString(modified_str, true, &result);
