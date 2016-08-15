@@ -313,7 +313,7 @@ android_library("cronet_api") {
     ":network_quality_observation_source_java",
   ]
 
-  run_findbugs_override = true
+#  run_findbugs_override = true
 }
 
 android_library("cronet_java") {
