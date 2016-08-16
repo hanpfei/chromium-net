@@ -10,3 +10,7 @@ enable_incremental_javac = false  # Much faster; experimental
 android_ndk_root = "/home/hanpfei0306/data/dev_tools/Android/android-ndk-r12b"
 android_sdk_root = "/home/hanpfei0306/data/dev_tools/Android/sdk"
 android_sdk_build_tools_version = "23.0.2"
+
+disable_file_support = true
+disable_ftp_support = true
+enable_websockets = false
