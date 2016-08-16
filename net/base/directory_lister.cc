@@ -44,9 +44,8 @@ bool CompareAlphaDirsFirst(const DirectoryLister::DirectoryListerData& a,
   if (a_is_directory != b_is_directory)
     return a_is_directory;
 
-  return a.info.GetName() == b.info.GetName();
-//  return base::i18n::LocaleAwareCompareFilenames(a.info.GetName(),
-//                                                 b.info.GetName());
+  return base::i18n::LocaleAwareCompareFilenames(a.info.GetName(),
+                                                 b.info.GetName());
 }
 
 void SortData(std::vector<DirectoryLister::DirectoryListerData>* data,

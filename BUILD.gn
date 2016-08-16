@@ -118,6 +118,33 @@ group("both_gn_and_gyp") {
     ]
   }
 
+  if (is_linux) {
+    # The following are definitely linux-only.
+    deps += [
+      "//net:disk_cache_memory_test",
+      "//net:quic_client",
+      "//net:quic_server",
+    ]
+  }
+
+  # TODO(GYP): Figure out which of these should (and can) build
+  # for chromeos/ios.
+  if (!is_chromeos && !is_ios) {
+    if (!is_android) {
+      deps += [
+        "//net:crash_cache",
+        "//net:crl_set_dump",
+        "//net:dns_fuzz_stub",
+        "//net:gdig",
+        "//net:get_server_time",
+        "//net:net_watcher",  # TODO(GYP): This should be conditional on use_v8_in_net
+        "//net:run_testserver",
+        "//net:stress_cache",
+        "//net:tld_cleanup",
+      ]
+    }
+  }
+
   if (is_mac) {
     deps += [
       "//third_party/apple_sample_code",

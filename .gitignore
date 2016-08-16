@@ -6,21 +6,21 @@
 .project
 .settings
 .tags
-# *.so
+out/Default/*.ninja
+out/Default/*.so
 *.so.TOC
 *.dat
 
-
 out/Default/.ninja_deps
 out/Default/.ninja_log
-out/Default/build.ninja
+out/Default/android_lint_cache/
 out/Default/build.ninja.d
 out/Default/clang_x64/
 out/Default/clang_x86/
 out/Default/gen/
 out/Default/gradle/
+out/Default/lib.java/
 out/Default/lib.unstripped/
-out/Default/libbase.cr.so
-out/Default/libbase.cr.so.TOC
+out/Default/pyproto/
 out/Default/obj/
-out/Default/toolchain.ninja
+
