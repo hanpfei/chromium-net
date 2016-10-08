@@ -119,7 +119,7 @@ config("runtime_library") {
   if (is_component_build || is_asan) {
     libs = [ "c++_shared" ]
   } else {
-    libs = [ "c++_static" ]
+    libs = [ "c++_shared", "c++_static" ]
   }
 
   # Manually link the libgcc.a that the cross compiler uses. This is

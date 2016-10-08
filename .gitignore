@@ -28,3 +28,15 @@ out/Default/libcronet.so
 out/Default/pyproto/
 out/Default/obj/
 out/Default/toolchain.ninja
+
+components/.classpath
+components/cronet/.cproject
+components/cronet/android/.classpath
+out/Default/exe.unstripped/
+out/Default/libboringssl.cr.so
+out/Default/libcrcrypto.cr.so
+out/Default/libnet.cr.so
+out/Default/libprefs.cr.so
+out/Default/libprotobuf_lite.cr.so
+out/Default/liburl.cr.so
+out/Default/quic_client
