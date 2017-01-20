@@ -10,24 +10,29 @@ chromium-net-independent 库的优势：
 ## 在Linux平台上构建
 
 1. Clone 当本仓库
+
 ```
 $ git clone https://github.com/hanpfei/chromium-net-independent.git
 $ cd chromium-net-independent
 ```
 2. 如果你是第一次构建，则安装依赖：
+
 ```
 $ ./build/install-build-deps.sh
 ```
 3. 配置编译环境
+
 本repo包含两个branch，分别为master和cronet。master branch的代码可以分别编译出net等独立的共享库。cornet branch的代码则可以用于编译chromium net android 平台的封装cronet。
 要想编译cronet，则首先切换至cronet branch。然后编辑out/Default/args.gn文件，依据自己本地的环境，修改android_sdk_root指向自己本地Android SDK的安装目录；修改android_ndk_root指向自己本地的NDK目录（要求NDK版本为R10）；可以根据需要配置target_cpu。
 4. 构建Cronet
+
 ```
 $ gn gen out/Default/
 $ ninja -C out/Default/ cronet
 $ ninja -C out/Default/ cronet_java
 ```
 5. 导入二进制文件
+
 像通常使用第三方Java库那样，将如下的jar文件导入Android工程：
 ```
 out/Default/lib.java/base/base_java.jar
