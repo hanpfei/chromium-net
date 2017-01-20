@@ -11,7 +11,7 @@ chromium-net-independent 库的优势：
 在Linux平台上构建
 -----------------
 
-1. Clone 当本仓库
+1. 克隆本仓库
    ```
    $ git clone https://github.com/hanpfei/chromium-net-independent.git
    $ cd chromium-net-independent
