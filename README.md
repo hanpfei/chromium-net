@@ -33,6 +33,7 @@ chromium-net-independent 库的优势：
    $ ninja -C out/Default/ cronet_java
    ```
 5. 导入二进制文件
+
    像通常使用第三方Java库那样，将如下的jar文件导入Android工程：
    ```
    out/Default/lib.java/base/base_java.jar
