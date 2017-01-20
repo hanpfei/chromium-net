@@ -10,14 +10,12 @@ chromium-net-independent 库的优势：
 ## 在Linux平台上构建
 
 1. Clone 当本仓库
-
 ```
 $ git clone https://github.com/hanpfei/chromium-net-independent.git
 $ cd chromium-net-independent
 ```
 
 2. 如果你是第一次构建，则安装依赖：
-
 ```
 $ ./build/install-build-deps.sh
 ```
