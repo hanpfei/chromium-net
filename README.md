@@ -1,4 +1,4 @@
-# chromium-net-independent
+chromium-net-independent
 
 chromium-net-independent是一个独立的网络库，它包含了Chromium中网络相关的代码，包括net库，url库，SSL库，以及Android平台的Java封装等等。同时它还是一个跨平台库，可以应用于Android等移动平台上。
 
@@ -7,18 +7,19 @@ chromium-net-independent 库的优势：
 
 * 全平台支持HTTP/2及QUIC等最新的网络协议。HTTP/2本身对TLS的版本有要求，同样由于内含SSL库，而可以全平台支持HTTP/2。
 
-## 在Linux平台上构建
+在Linux平台上构建
+-----------------
 
 1. Clone 当本仓库
-```
-$ git clone https://github.com/hanpfei/chromium-net-independent.git
-$ cd chromium-net-independent
-```
+   ```
+   $ git clone https://github.com/hanpfei/chromium-net-independent.git
+   $ cd chromium-net-independent
+   ```
 
 2. 如果你是第一次构建，则安装依赖：
-```
-$ ./build/install-build-deps.sh
-```
+   ```
+   $ ./build/install-build-deps.sh
+   ```
 
 3. 配置编译环境
 
