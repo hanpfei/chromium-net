@@ -39,17 +39,25 @@
 #include "components/prefs/pref_service.h"
 #include "components/prefs/pref_service_factory.h"
 #include "jni/CronetUrlRequestContext_jni.h"
+#include "net/base/address_list.h"
+#include "net/base/completion_callback.h"
+#include "net/base/ip_address.h"
+#include "net/base/ip_endpoint.h"
 #include "net/base/load_flags.h"
 #include "net/base/logging_network_change_observer.h"
 #include "net/base/net_errors.h"
 #include "net/base/network_delegate_impl.h"
+#include "net/base/request_priority.h"
 #include "net/base/url_util.h"
 #include "net/cert/caching_cert_verifier.h"
 #include "net/cert/cert_verifier.h"
 #include "net/cookies/cookie_monster.h"
+#include "net/dns/host_cache.h"
+#include "net/dns/host_resolver.h"
 #include "net/http/http_auth_handler_factory.h"
 #include "net/http/http_server_properties_manager.h"
 #include "net/log/write_to_file_net_log_observer.h"
+#include "net/log/net_log.h"
 #include "net/nqe/external_estimate_provider.h"
 #include "net/nqe/network_quality_estimator.h"
 #include "net/proxy/proxy_config_service_android.h"
@@ -392,6 +400,108 @@ void InitializeStorageDirectory(const base::FilePath& dir) {
 
 namespace cronet {
 
+class CronetHostResolverImpl : public net::HostResolver {
+public:
+  CronetHostResolverImpl(
+      cronet::CronetURLRequestContextAdapter* request_context,
+      net::NetLog* net_log) :
+      mRequestContextAdapter(request_context), mDefaultResolver(
+          net::HostResolver::CreateDefaultResolver(net_log)) {
+  }
+
+  // If any completion callbacks are pending when the resolver is destroyed,
+  // the host resolutions are cancelled, and the completion callbacks will not
+  // be called.
+  ~CronetHostResolverImpl() override {}
+
+  // Resolves the given hostname (or IP address literal), filling out the
+  // |addresses| object upon success.  The |info.port| parameter will be set as
+  // the sin(6)_port field of the sockaddr_in{6} struct.  Returns OK if
+  // successful or an error code upon failure.  Returns
+  // ERR_NAME_NOT_RESOLVED if hostname is invalid, or if it is an
+  // incompatible IP literal (e.g. IPv6 is disabled and it is an IPv6
+  // literal).
+  //
+  // If the operation cannot be completed synchronously, ERR_IO_PENDING will
+  // be returned and the real result code will be passed to the completion
+  // callback.  Otherwise the result code is returned immediately from this
+  // call.
+  //
+  // [out_req] must be owned by a caller. If the request is not completed
+  // synchronously, it will be filled with a handle to the request. It must be
+  // completed before the HostResolver itself is destroyed.
+  //
+  // Requests can be cancelled any time by deletion of the [out_req]. Deleting
+  // |out_req| will cancel the request, and cause |callback| not to be invoked.
+  //
+  // Profiling information for the request is saved to |net_log| if non-NULL.
+  int Resolve(const RequestInfo& info, net::RequestPriority priority,
+      net::AddressList* addresses, const net::CompletionCallback& callback,
+      std::unique_ptr<Request>* out_req, const net::BoundNetLog& net_log) override {
+    JNIEnv* env = base::android::AttachCurrentThread();
+    ScopedJavaLocalRef<jobjectArray> result =
+        Java_CronetUrlRequestContext_onHostResolve(env,
+            mRequestContextAdapter->jcronet_url_request_context_.obj(),
+            base::android::ConvertUTF8ToJavaString(env, info.hostname()).obj());
+
+    std::vector<std::string> ips;
+    base::android::AppendJavaStringArrayToStringVector(env, result.obj(), &ips);
+    if (ips.size() > 0) {
+      for (std::vector<std::string>::iterator iter = ips.begin();
+          iter != ips.end(); ++iter) {
+        net::IPAddress ip_address;
+        if (ip_address.AssignFromIPLiteral(*iter)) {
+          addresses->push_back(net::IPEndPoint(ip_address, info.port()));
+        }
+      }
+      return net::OK;
+    }
+
+    return mDefaultResolver->Resolve(info, priority, addresses, callback, out_req, net_log);
+  }
+
+  // Resolves the given hostname (or IP address literal) out of cache or HOSTS
+  // file (if enabled) only. This is guaranteed to complete synchronously.
+  // This acts like |Resolve()| if the hostname is IP literal, or cached value
+  // or HOSTS entry exists. Otherwise, ERR_DNS_CACHE_MISS is returned.
+  int ResolveFromCache(const RequestInfo& info, net::AddressList* addresses,
+      const net::BoundNetLog& net_log) override {
+    return mDefaultResolver->ResolveFromCache(info, addresses, net_log);
+  }
+
+  // Enable or disable the built-in asynchronous DnsClient.
+  void SetDnsClientEnabled(bool enabled) override {
+    mDefaultResolver->SetDnsClientEnabled(enabled);
+  }
+
+  // Returns the HostResolverCache |this| uses, or NULL if there isn't one.
+  // Used primarily to clear the cache and for getting debug information.
+  net::HostCache* GetHostCache() override {
+    return mDefaultResolver->GetHostCache();
+  }
+
+  // Returns the current DNS configuration |this| is using, as a Value, or
+  // nullptr if it's configured to always use the system host resolver.
+  std::unique_ptr<base::Value> GetDnsConfigAsValue() const override {
+    return mDefaultResolver->GetDnsConfigAsValue();
+  }
+
+  // Configures the HostResolver to be able to persist data (e.g. observed
+  // performance) between sessions. |persist_callback| is a callback that will
+  // be called when the HostResolver wants to persist data; |old_data| is the
+  // data last persisted by the resolver on the previous session.
+  void InitializePersistence(const net::HostResolver::PersistCallback& persist_callback,
+      std::unique_ptr<const base::Value> old_data) override {
+//    mDefaultResolver->InitializePersistence(persist_callback, old_data);
+  }
+
+private:
+  cronet::CronetURLRequestContextAdapter *mRequestContextAdapter;
+  std::unique_ptr<HostResolver> mDefaultResolver;
+
+  DISALLOW_COPY_AND_ASSIGN(CronetHostResolverImpl);
+};
+
 // Explicitly register static JNI functions.
 bool CronetUrlRequestContextAdapterRegisterJni(JNIEnv* env) {
   return RegisterNativesImpl(env);
@@ -608,6 +718,8 @@ void CronetURLRequestContextAdapter::InitializeOnNetworkThread(
     context_builder.set_socket_performance_watcher_factory(
         network_quality_estimator_->GetSocketPerformanceWatcherFactory());
   }
+  context_builder.set_host_resolver(std::unique_ptr<net::HostResolver>(
+        new CronetHostResolverImpl(this, g_net_log.Get().net_log())));
 
   context_ = context_builder.Build();
   if (network_quality_estimator_)

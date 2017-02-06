@@ -51,6 +51,7 @@ bool CronetUrlRequestContextAdapterRegisterJni(JNIEnv* env);
 class CronetURLRequestContextAdapter
     : public net::NetworkQualityEstimator::RTTObserver,
       public net::NetworkQualityEstimator::ThroughputObserver {
+  friend class CronetHostResolverImpl;
  public:
   explicit CronetURLRequestContextAdapter(
       std::unique_ptr<URLRequestContextConfig> context_config);

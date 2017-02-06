@@ -20,6 +20,7 @@ import org.chromium.base.annotations.NativeClassQualifiedName;
 import org.chromium.base.annotations.UsedByReflection;
 import org.chromium.net.BidirectionalStream;
 import org.chromium.net.CronetEngine;
+import org.chromium.net.HostResolver;
 import org.chromium.net.NetworkQualityRttListener;
 import org.chromium.net.NetworkQualityThroughputListener;
 import org.chromium.net.RequestFinishedInfo;
@@ -27,6 +28,7 @@ import org.chromium.net.UrlRequest;
 import org.chromium.net.urlconnection.CronetHttpURLConnection;
 import org.chromium.net.urlconnection.CronetURLStreamHandlerFactory;
 
+import java.net.InetAddress;
 import java.net.Proxy;
 import java.net.URL;
 import java.net.URLConnection;
@@ -97,6 +99,8 @@ public class CronetUrlRequestContext extends CronetEngine {
     /** Holds CertVerifier data. */
     private String mCertVerifierData;
 
+    private HostResolver mHostResolver;
+
     @UsedByReflection("CronetEngine.java")
     public CronetUrlRequestContext(final CronetEngine.Builder builder) {
         CronetLibraryLoader.ensureInitialized(builder.getContext(), builder);
@@ -108,6 +112,7 @@ public class CronetUrlRequestContext extends CronetEngine {
                 throw new NullPointerException("Context Adapter creation failed.");
             }
             mNetworkQualityEstimatorEnabled = builder.networkQualityEstimatorEnabled();
+            mHostResolver = builder.hostResolver();
         }
 
         // Init native Chromium URLRequestContext on main UI thread.
@@ -499,6 +504,29 @@ public class CronetUrlRequestContext extends CronetEngine {
             Log.e(CronetUrlRequestContext.LOG_TAG, "Exception posting task to executor",
                     failException);
         }
+    }
+
+    @SuppressWarnings("unused")
+    @CalledByNative
+    private String[] onHostResolve(String hostname) {
+        String[] ips = null;
+        if (mHostResolver != null) {
+            try {
+                List<InetAddress> ipList = mHostResolver.resolve(hostname);
+                if (ipList != null && ipList.size() > 0) {
+                    ips = new String[ipList.size()];
+                    for (int i = 0; i < ipList.size(); ++i) {
+                        InetAddress ipAddr = ipList.get(i);
+                        ips[i] = ipAddr.getHostAddress().toString();
+                    }
+                }
+            } catch (Exception e) {
+            }
+        }
+        if (ips == null) {
+            ips = new String[0];
+        }
+        return ips;
     }
 
     // Native methods are implemented in cronet_url_request_context_adapter.cc.

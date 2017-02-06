@@ -128,6 +128,7 @@ public abstract class CronetEngine {
         private long mMockCertVerifier;
         private boolean mNetworkQualityEstimatorEnabled;
         private String mCertVerifierData;
+        private HostResolver mHostResolver;
 
         /**
          * Default config enables SPDY, disables QUIC, SDCH and HTTP cache.
@@ -740,6 +741,15 @@ public abstract class CronetEngine {
          */
         public String certVerifierData() {
             return mCertVerifierData;
+        }
+
+        public Builder setHostResolver(HostResolver hostResolver) {
+            mHostResolver = hostResolver;
+            return this;
+        }
+
+        public HostResolver hostResolver() {
+            return mHostResolver;
         }
 
         /**

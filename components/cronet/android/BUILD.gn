@@ -274,6 +274,7 @@ android_library("cronet_api") {
     "api/src/org/chromium/net/ChunkedWritableByteChannel.java",
     "api/src/org/chromium/net/CronetEngine.java",
     "api/src/org/chromium/net/CronetException.java",
+    "api/src/org/chromium/net/HostResolver.java",
     "api/src/org/chromium/net/HttpUrlConnectionUrlRequest.java",
     "api/src/org/chromium/net/HttpUrlConnectionUrlRequestFactory.java",
     "api/src/org/chromium/net/HttpUrlRequest.java",
