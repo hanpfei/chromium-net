@@ -48,6 +48,8 @@ public interface UrlRequest {
         boolean mDisableCache;
         // Disable connection migration for just this request.
         boolean mDisableConnectionMigration;
+        // Bypass proxy.
+        boolean mBypassProxy;
         // Priority of request. Default is medium.
         @RequestPriority int mPriority = REQUEST_PRIORITY_MEDIUM;
         // Request reporting annotations. Avoid extra object creation if no annotations added.
@@ -151,6 +153,11 @@ public interface UrlRequest {
          */
         public Builder disableConnectionMigration() {
             mDisableConnectionMigration = true;
+            return this;
+        }
+
+        public Builder bypassProxy() {
+            mBypassProxy = true;
             return this;
         }
 
@@ -258,7 +265,8 @@ public interface UrlRequest {
          */
         public UrlRequest build() {
             final UrlRequest request = mCronetEngine.createRequest(mUrl, mCallback, mExecutor,
-                    mPriority, mRequestAnnotations, mDisableCache, mDisableConnectionMigration);
+                    mPriority, mRequestAnnotations, mDisableCache, mDisableConnectionMigration,
+                    mBypassProxy);
             if (mMethod != null) {
                 request.setHttpMethod(mMethod);
             }

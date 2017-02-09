@@ -58,7 +58,7 @@ final class JavaCronetEngine extends CronetEngine {
     @Override
     public UrlRequest createRequest(String url, UrlRequest.Callback callback, Executor executor,
             int priority, Collection<Object> connectionAnnotations, boolean disableCache,
-            boolean disableConnectionMigration) {
+            boolean disableConnectionMigration, boolean bypassProxy) {
         return new JavaUrlRequest(callback, mExecutorService, executor, url, mUserAgent);
     }
 

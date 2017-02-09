@@ -44,7 +44,8 @@ static jlong CreateRequestAdapter(JNIEnv* env,
                                   const JavaParamRef<jstring>& jurl_string,
                                   jint jpriority,
                                   jboolean jdisable_cache,
-                                  jboolean jdisable_connection_migration) {
+                                  jboolean jdisable_connection_migration,
+                                  jboolean jbypass_proxy) {
   CronetURLRequestContextAdapter* context_adapter =
       reinterpret_cast<CronetURLRequestContextAdapter*>(
           jurl_request_context_adapter);
@@ -58,7 +59,7 @@ static jlong CreateRequestAdapter(JNIEnv* env,
   CronetURLRequestAdapter* adapter = new CronetURLRequestAdapter(
       context_adapter, env, jurl_request, url,
       static_cast<net::RequestPriority>(jpriority), jdisable_cache,
-      jdisable_connection_migration);
+      jdisable_connection_migration, jbypass_proxy);
 
   return reinterpret_cast<jlong>(adapter);
 }
@@ -70,7 +71,8 @@ CronetURLRequestAdapter::CronetURLRequestAdapter(
     const GURL& url,
     net::RequestPriority priority,
     jboolean jdisable_cache,
-    jboolean jdisable_connection_migration)
+    jboolean jdisable_connection_migration,
+    jboolean jbypass_proxy)
     : context_(context),
       initial_url_(url),
       initial_priority_(priority),
@@ -82,6 +84,9 @@ CronetURLRequestAdapter::CronetURLRequestAdapter(
     load_flags_ |= net::LOAD_DISABLE_CACHE;
   if (jdisable_connection_migration == JNI_TRUE)
     load_flags_ |= net::LOAD_DISABLE_CONNECTION_MIGRATION;
+  if (jbypass_proxy == JNI_TRUE) {
+    load_flags_ |= net::LOAD_BYPASS_PROXY;
+  }
 }
 
 CronetURLRequestAdapter::~CronetURLRequestAdapter() {

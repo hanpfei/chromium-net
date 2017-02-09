@@ -88,6 +88,7 @@ public final class CronetUrlRequest implements UrlRequest {
     private final Collection<Object> mRequestAnnotations;
     private final boolean mDisableCache;
     private final boolean mDisableConnectionMigration;
+    private final boolean mBypassProxy;
 
     private CronetUploadDataStream mUploadDataStream;
 
@@ -130,7 +131,7 @@ public final class CronetUrlRequest implements UrlRequest {
     CronetUrlRequest(CronetUrlRequestContext requestContext, String url, int priority,
             UrlRequest.Callback callback, Executor executor, Collection<Object> requestAnnotations,
             boolean metricsCollectionEnabled, boolean disableCache,
-            boolean disableConnectionMigration) {
+            boolean disableConnectionMigration, boolean bypassProxy) {
         if (url == null) {
             throw new NullPointerException("URL is required");
         }
@@ -155,6 +156,7 @@ public final class CronetUrlRequest implements UrlRequest {
                 metricsCollectionEnabled ? new UrlRequestMetricsAccumulator() : null;
         mDisableCache = disableCache;
         mDisableConnectionMigration = disableConnectionMigration;
+        mBypassProxy = bypassProxy;
     }
 
     @Override
@@ -197,7 +199,8 @@ public final class CronetUrlRequest implements UrlRequest {
             try {
                 mUrlRequestAdapter =
                         nativeCreateRequestAdapter(mRequestContext.getUrlRequestContextAdapter(),
-                                mInitialUrl, mPriority, mDisableCache, mDisableConnectionMigration);
+                                mInitialUrl, mPriority, mDisableCache, mDisableConnectionMigration,
+                                mBypassProxy);
                 mRequestContext.onRequestStarted();
                 if (mInitialMethod != null) {
                     if (!nativeSetHttpMethod(mUrlRequestAdapter, mInitialMethod)) {
@@ -739,7 +742,7 @@ public final class CronetUrlRequest implements UrlRequest {
     // Native methods are implemented in cronet_url_request_adapter.cc.
 
     private native long nativeCreateRequestAdapter(long urlRequestContextAdapter, String url,
-            int priority, boolean disableCache, boolean disableConnectionMigration);
+            int priority, boolean disableCache, boolean disableConnectionMigration, boolean bypassProxy);
 
     @NativeClassQualifiedName("CronetURLRequestAdapter")
     private native boolean nativeSetHttpMethod(long nativePtr, String method);

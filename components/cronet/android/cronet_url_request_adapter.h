@@ -60,7 +60,8 @@ class CronetURLRequestAdapter : public net::URLRequest::Delegate {
                           const GURL& url,
                           net::RequestPriority priority,
                           jboolean jdisable_cache,
-                          jboolean jdisable_connection_migration);
+                          jboolean jdisable_connection_migration,
+                          jboolean jbypass_proxy);
   ~CronetURLRequestAdapter() override;
 
   // Methods called prior to Start are never called on network thread.

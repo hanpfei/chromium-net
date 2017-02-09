@@ -832,7 +832,7 @@ public abstract class CronetEngine {
     public final UrlRequest createRequest(String url, UrlRequest.Callback callback,
             Executor executor, @UrlRequest.Builder.RequestPriority int priority) {
         return createRequest(
-                url, callback, executor, priority, Collections.emptyList(), false, false);
+                url, callback, executor, priority, Collections.emptyList(), false, false, false);
     }
 
     /**
@@ -852,6 +852,7 @@ public abstract class CronetEngine {
      *         If context is not set up to use cache this param has no effect.
      * @param disableConnectionMigration disables connection migration for this
      *         request if it is enabled for the session.
+     * @param bypassProxy bypass proxy.
      * @return new request.
      * @deprecated Use {@link UrlRequest.Builder#build}.
      * @hide as it references hidden RequestFinishedInfo.Listener
@@ -859,7 +860,7 @@ public abstract class CronetEngine {
     @Deprecated
     protected abstract UrlRequest createRequest(String url, UrlRequest.Callback callback,
             Executor executor, int priority, Collection<Object> requestAnnotations,
-            boolean disableCache, boolean disableConnectionMigration);
+            boolean disableCache, boolean disableConnectionMigration, boolean bypassProxy);
 
     /**
      * Creates a {@link BidirectionalStream} object. {@code callback} methods will
