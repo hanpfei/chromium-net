@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Type: text/plain
+Content-Length: 19
+header-name: header-value
+Via: 1.1 Chrome-Compression-Proxy

@@ -1,0 +1,15 @@
+// Copyright 2014 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+package org.chromium.net.impl;
+
+// Version based on chrome/VERSION.
+public class ImplVersion {
+    public static final String CRONET_VERSION = "@MAJOR@.@MINOR@.@BUILD@.@PATCH@";
+    public static final String LAST_CHANGE = "@LASTCHANGE@";
+
+    public static String getVersion() {
+        return CRONET_VERSION + "@" + LAST_CHANGE.substring(0, 8);
+    }
+}

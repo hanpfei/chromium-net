@@ -14,6 +14,7 @@ out/Default/*.so
 out/Default/.ninja_deps
 out/Default/.ninja_log
 out/Default/android_lint_cache/
+out/Default/build.ninja
 out/Default/build.ninja.d
 out/Default/clang_x64/
 out/Default/clang_x86/
@@ -23,4 +24,21 @@ out/Default/lib.java/
 out/Default/lib.unstripped/
 out/Default/pyproto/
 out/Default/obj/
+out/Default/libbase.cr.so
+out/Default/libbase.cr.so.TOC
+out/Default/libcronet.so
+out/Default/pyproto/
+out/Default/obj/
+out/Default/toolchain.ninja
 
+components/.classpath
+components/cronet/.cproject
+components/cronet/android/.classpath
+out/Default/exe.unstripped/
+out/Default/libboringssl.cr.so
+out/Default/libcrcrypto.cr.so
+out/Default/libnet.cr.so
+out/Default/libprefs.cr.so
+out/Default/libprotobuf_lite.cr.so
+out/Default/liburl.cr.so
+out/Default/quic_client

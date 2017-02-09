@@ -1,0 +1,27 @@
+<project>
+  <target name="doc" description="generate documentation">
+      <javadoc destdir="${doc.dir}"
+               overview="${overview}"
+               bootclasspath="../../../../third_party/android_tools/sdk/platforms/android-23/android.jar:../../../../third_party/android_tools/sdk/extras/android/support/annotations/android-support-annotations.jar:${lib.java.dir}/cronet_javadoc_classpath.jar"
+               docletpath="../../../../buildtools/android/doclava/jsilver.jar:../../../../buildtools/android/doclava/doclava.jar"
+               >
+        <fileset dir="${source.dir}" defaultexcludes="yes">
+          <include name="**/*.java"/>
+          <!-- exclude legacy API -->
+          <exclude name="**/Chromium*.java"/>
+          <exclude name="**/ChunkedWritableByteChannel*.java"/>
+          <exclude name="**/HttpUrl*.java"/>
+          <exclude name="**/ResponseTooLargeException.java"/>
+          <exclude name="**/UrlRequestContextConfig.java"/>
+        </fileset>
+        <doclet name="com.google.doclava.Doclava">
+          <param name="-title" /><param name="Cronet API"/>
+          <!-- federation -->
+          <param name="-federate" /><param name="Android"/>
+          <param name="https://developer.android.com/"/>
+          <param name="-federationapi"/><param name="Android"/>
+          <param name="../../../../buildtools/android/doclava/current.txt"/>
+        </doclet>
+      </javadoc>
+  </target>
+</project>

@@ -968,6 +968,12 @@ int HttpStreamFactoryImpl::Job::DoInitConnectionComplete(int result) {
     return OK;
   }
 
+  if (result == ERR_PROXY_CONNECTION_FAILED) {
+    proxy_info_.UseDirect();
+    next_state_ = STATE_RESOLVE_PROXY_COMPLETE;
+    return OK;
+  }
+
   if (result == ERR_SPDY_SESSION_ALREADY_EXISTS) {
     // We found a SPDY connection after resolving the host. This is
     // probably an IP pooled connection.

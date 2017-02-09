@@ -111,7 +111,7 @@ if (is_nacl) {
 
 if (is_android) {
   config("android_system_libs") {
-    libs = [ "log", "unwind" ]  # Used by logging.cc.
+    libs = [ "log", ]  # Used by logging.cc.
   }
 }
 

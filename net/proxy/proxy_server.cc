@@ -63,6 +63,8 @@ ProxyServer::Scheme GetSchemeFromURIInternal(base::StringPiece type) {
 
 }  // namespace
 
+const ProxyServer ProxyServer::direct_proxy_server_(SCHEME_DIRECT, HostPortPair());
+
 ProxyServer::ProxyServer(Scheme scheme, const HostPortPair& host_port_pair)
       : scheme_(scheme), host_port_pair_(host_port_pair) {
   if (scheme_ == SCHEME_DIRECT || scheme_ == SCHEME_INVALID) {
