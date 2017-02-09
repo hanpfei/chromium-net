@@ -115,8 +115,8 @@ class NET_EXPORT ProxyServer {
                                    std::string::const_iterator pac_string_end);
 
   // Returns a ProxyServer representing DIRECT connections.
-  static ProxyServer Direct() {
-    return ProxyServer(SCHEME_DIRECT, HostPortPair());
+  static const ProxyServer& Direct() {
+    return direct_proxy_server_;
   }
 
 #if defined(OS_MACOSX)
@@ -162,6 +162,8 @@ class NET_EXPORT ProxyServer {
       Scheme scheme,
       std::string::const_iterator host_and_port_begin,
       std::string::const_iterator host_and_port_end);
+
+  static const ProxyServer direct_proxy_server_;
 
   Scheme scheme_;
   HostPortPair host_port_pair_;
