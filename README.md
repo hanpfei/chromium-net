@@ -1,4 +1,4 @@
-chromium-net-independent
+chromium-net
 ==========
 
 chromium-net-independent是一个独立的网络库，它包含了Chromium中网络相关的代码，包括net库，url库，SSL库，以及Android平台的Java封装等等。同时它还是一个跨平台库，可以应用于Android等移动平台上。
