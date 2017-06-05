@@ -1,26 +1,26 @@
 chromium-net
 ==========
 
-chromium-net-independent是一个独立的网络库，它包含了Chromium中网络相关的代码，包括net库，url库，SSL库，以及Android平台的Java封装等等。同时它还是一个跨平台库，可以应用于Android等移动平台上。
+chromium-net 是一个独立的网络库，它包含了著名的开源浏览器 Chromium 项目中网络相关的代码，包括 net 库，url 库，SSL 库，以及 Android 平台的 Java 封装等。它同时还是一个跨平台库，可以应用于 Android 等移动平台。
 
-chromium-net-independent 库的优势：
- * 全平台支持最新版TLS。不像OkHttp这样依赖系统提供SSL/TLS加解密功能的网络库，chromium-net-independent自身包含SSL库，因而可以全平台支持安全性更高的最新版TLS。
-
-* 全平台支持HTTP/2及QUIC等最新的网络协议。HTTP/2本身对TLS的版本有要求，同样由于内含SSL库，而可以全平台支持HTTP/2。
+chromium-net 库的优势：
+ * 全平台支持最新版TLS。不像 OkHttp 这样依赖系统提供 SSL/TLS 加解密功能的网络库，chromium-net 自身包含 SSL 库，因而可以全平台支持安全性更高的最新版 TLS。
+ * 全平台支持 HTTP/2。HTTP/2 的协议协商，需要用到 TLS 较新的扩展 ALPN，同时 HTTP/2 对 TLS 加密套件也有一定的要求，由于自身包含 SSL 库，使得 HTTP/2 的这些要求在任何平台都变得易于满足。
+* 全平台支持 QUIC 协议。chromium-net 目前是 Android 平台支持 QUIC 协议仅有的选择。
 
 在Linux平台上构建
 -----------------
 
 1. 克隆本仓库
    ```
-   $ git clone https://github.com/hanpfei/chromium-net-independent.git
-   $ cd chromium-net-independent
+   $ git clone https://github.com/hanpfei/chromium-net.git
+   $ cd chromium-net
    ```
 
 2. 如果你是第一次构建，则安装依赖：
    ```
-   $ ./build/install-build-deps.sh
-   ```
+   $ ./build/install-build-deps.sh 
+   ```
 
 3. 配置编译环境
 
