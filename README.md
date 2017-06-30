@@ -18,6 +18,7 @@ chromium-net 库的优势：
    ```
 
 2. 如果你是第一次构建，则安装依赖
+
    ```
    $ ./build/install-build-deps.sh 
    ```
