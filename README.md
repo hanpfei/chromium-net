@@ -19,14 +19,8 @@ chromium-net 库的优势：
 
 2. 如果你是第一次构建，则安装依赖
    ```
-   $ git clone https://github.com/hanpfei/chromium-net.git
-   $ cd chromium-net
+   $ ./build/install-build-deps.sh
    ```
-
-
-   ```
-   $ ./build/install-build-deps.sh 
-   ```
 
 3. 配置编译环境
 
